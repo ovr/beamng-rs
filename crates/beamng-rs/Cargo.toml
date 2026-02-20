@@ -1,0 +1,15 @@
+[package]
+name = "beamng-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Rust SDK for BeamNG.tech simulator"
+
+[dependencies]
+beamng-proto = { path = "../beamng-proto" }
+rmpv = { version = "1", features = ["with-serde"] }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["net", "io-util", "sync", "time", "macros", "rt-multi-thread", "process"] }
+tracing = "0.1"
+
+[dev-dependencies]
+tracing-subscriber = "0.3"
