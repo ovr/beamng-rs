@@ -52,8 +52,7 @@ impl eframe::App for App {
             match &mut self.texture {
                 Some(h) => h.set(img, egui::TextureOptions::LINEAR),
                 None => {
-                    self.texture =
-                        Some(ctx.load_texture("cam", img, egui::TextureOptions::LINEAR));
+                    self.texture = Some(ctx.load_texture("cam", img, egui::TextureOptions::LINEAR));
                 }
             }
         }
@@ -172,7 +171,10 @@ fn main() -> eframe::Result {
                 println!("Scenario created.");
 
                 let mut ego = Vehicle::new("ego", "etk800");
-                bng.settings().set_deterministic(Some(60), None).await.unwrap();
+                bng.settings()
+                    .set_deterministic(Some(60), None)
+                    .await
+                    .unwrap();
                 bng.scenario()
                     .load_scenario(&scenario, true, &mut [&mut ego])
                     .await
@@ -234,8 +236,8 @@ fn main() -> eframe::Result {
                         continue;
                     }
 
-                    // 3. Grab the rendered frame via ad-hoc poll
-                    match camera.ad_hoc_poll_raw().await {
+                    // 3. Grab the rendered frame (poll_raw = 1 round-trip vs ad-hoc's 3+)
+                    match camera.poll_raw().await {
                         Ok(raw) => {
                             if let Some(rgba) = raw.colour.and_then(colour_to_rgba) {
                                 let frame_ms = tick_start.elapsed().as_secs_f64() * 1000.0;

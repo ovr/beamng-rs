@@ -66,7 +66,9 @@ pub fn value_to_str_dict(val: rmpv::Value) -> Option<StrDict> {
         rmpv::Value::Map(pairs) => {
             let mut map = HashMap::with_capacity(pairs.len());
             for (k, v) in pairs {
-                let key = key_to_string(k)?;
+                let Some(key) = key_to_string(k) else {
+                    continue;
+                };
                 map.insert(key, v);
             }
             Some(map)
