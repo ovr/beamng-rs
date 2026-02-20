@@ -1,6 +1,8 @@
 use std::time::Instant;
 
-use beamng_rs::sensors::{Camera, CameraConfig};
+use beamng_rs::sensors::{
+    AdvancedImu, AdvancedImuConfig, Camera, CameraConfig, Gps, GpsConfig, GpsReading, ImuReading,
+};
 use beamng_rs::vehicle::{Vehicle, VehicleOptions};
 use beamng_rs::{BeamNg, Scenario};
 use eframe::egui;
@@ -10,11 +12,13 @@ const W: usize = 1280;
 const H: usize = 720;
 
 /// Simulation steps per camera frame. Higher = faster sim, fewer network round-trips.
-const STEPS_PER_FRAME: u32 = 3;
+const STEPS_PER_FRAME: u32 = 6;
 
 struct Frame {
     colour: Vec<u8>,
     frame_ms: f64,
+    imu: Option<ImuReading>,
+    gps: Option<GpsReading>,
 }
 
 enum ControlCmd {
@@ -33,6 +37,8 @@ struct App {
     fps: f64,
     frame_ms: f64,
     convert_ms: f64,
+    imu: Option<ImuReading>,
+    gps: Option<GpsReading>,
 }
 
 impl eframe::App for App {
@@ -50,6 +56,8 @@ impl eframe::App for App {
             if frame.frame_ms > 0.0 {
                 self.fps = 1000.0 / frame.frame_ms;
             }
+            self.imu = frame.imu;
+            self.gps = frame.gps;
             let cvt_start = Instant::now();
             let img = colour_to_image(frame.colour);
             self.convert_ms = cvt_start.elapsed().as_secs_f64() * 1000.0;
@@ -93,20 +101,60 @@ impl eframe::App for App {
             if let Some(tex) = &self.texture {
                 let response = ui.image(tex);
 
-                // FPS overlay in top-left corner of the image
                 let rect = response.rect;
                 let painter = ui.painter();
-                let text = format!(
+
+                // FPS overlay in top-left corner
+                let fps_text = format!(
                     "{:.0} fps  |  {:.1} ms  |  cvt {:.2} ms",
                     self.fps, self.frame_ms, self.convert_ms
                 );
                 painter.text(
                     rect.left_top() + egui::vec2(8.0, 8.0),
                     egui::Align2::LEFT_TOP,
-                    text,
+                    fps_text,
                     egui::FontId::monospace(16.0),
                     egui::Color32::from_rgba_unmultiplied(0, 255, 0, 200),
                 );
+
+                // IMU overlay in top-right corner
+                if let Some(imu) = &self.imu {
+                    let imu_text = format!(
+                        "IMU\n\
+                         acc  {:7.2} {:7.2} {:7.2}\n\
+                         gyro {:7.3} {:7.3} {:7.3}",
+                        imu.acc_smooth.0,
+                        imu.acc_smooth.1,
+                        imu.acc_smooth.2,
+                        imu.ang_vel_smooth.0,
+                        imu.ang_vel_smooth.1,
+                        imu.ang_vel_smooth.2,
+                    );
+                    painter.text(
+                        rect.right_top() + egui::vec2(-8.0, 8.0),
+                        egui::Align2::RIGHT_TOP,
+                        imu_text,
+                        egui::FontId::monospace(14.0),
+                        egui::Color32::from_rgba_unmultiplied(0, 255, 0, 200),
+                    );
+                }
+
+                // GPS overlay in bottom-left corner
+                if let Some(gps) = &self.gps {
+                    let gps_text = format!(
+                        "GPS\n\
+                         pos  {:9.2} {:9.2}\n\
+                         lon  {:12.7}  lat {:12.7}",
+                        gps.x, gps.y, gps.lon, gps.lat,
+                    );
+                    painter.text(
+                        rect.left_bottom() + egui::vec2(8.0, -8.0),
+                        egui::Align2::LEFT_BOTTOM,
+                        gps_text,
+                        egui::FontId::monospace(14.0),
+                        egui::Color32::from_rgba_unmultiplied(0, 255, 0, 200),
+                    );
+                }
             } else {
                 ui.centered_and_justified(|ui| {
                     ui.label("Connecting to BeamNG...");
@@ -211,7 +259,33 @@ fn main() -> eframe::Result {
                 .unwrap();
                 println!("Camera opened.");
 
-                // Synchronized loop: apply controls → step sim → grab camera frame
+                let imu = AdvancedImu::open(
+                    "imu1",
+                    &mut bng,
+                    &ego,
+                    AdvancedImuConfig {
+                        is_visualised: false,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+                println!("IMU opened.");
+
+                let gps = Gps::open(
+                    "gps1",
+                    &mut bng,
+                    &ego,
+                    GpsConfig {
+                        is_visualised: false,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+                println!("GPS opened.");
+
+                // Synchronized loop: apply controls → step sim → grab camera + sensors
                 loop {
                     let tick_start = Instant::now();
 
@@ -250,8 +324,26 @@ fn main() -> eframe::Result {
                     match camera.poll_raw(&mut bng).await {
                         Ok(raw) => {
                             if let Some(colour) = raw.colour {
+                                // 4. Poll IMU & GPS sensors
+                                let imu_reading = imu
+                                    .poll(&mut bng)
+                                    .await
+                                    .ok()
+                                    .and_then(|r| r.into_iter().last());
+
+                                let gps_reading = gps
+                                    .poll(&mut bng)
+                                    .await
+                                    .ok()
+                                    .and_then(|r| r.into_iter().last());
+
                                 let frame_ms = tick_start.elapsed().as_secs_f64() * 1000.0;
-                                let _ = frame_tx.try_send(Frame { colour, frame_ms });
+                                let _ = frame_tx.try_send(Frame {
+                                    colour,
+                                    frame_ms,
+                                    imu: imu_reading,
+                                    gps: gps_reading,
+                                });
                             }
                         }
                         Err(e) => {
@@ -273,6 +365,8 @@ fn main() -> eframe::Result {
                 fps: 0.0,
                 frame_ms: 0.0,
                 convert_ms: 0.0,
+                imu: None,
+                gps: None,
             }))
         }),
     )
