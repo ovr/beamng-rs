@@ -6,7 +6,7 @@ use beamng_rs::{BeamNg, Scenario};
 async fn main() -> beamng_proto::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let bng = BeamNg::new("192.168.1.85", 5555).connect().await?;
+    let mut bng = BeamNg::new("192.168.1.85", 5555).connect().await?;
     println!("Connected to BeamNG.tech!");
 
     // Return to main menu to get a clean state, ignore errors if already there
@@ -14,7 +14,7 @@ async fn main() -> beamng_proto::Result<()> {
 
     // Clean up any leftover scenario from previous runs
     let _ = Scenario::delete(
-        &bng,
+        &mut bng,
         "/levels/italy/scenarios/camera_streaming/camera_streaming.json",
     )
     .await;
@@ -31,7 +31,7 @@ async fn main() -> beamng_proto::Result<()> {
             ..Default::default()
         },
     );
-    scenario.make(&bng).await?;
+    scenario.make(&mut bng).await?;
     println!("Scenario created.");
 
     // Configure and load (connects vehicles during load, matching Python SDK)
@@ -49,7 +49,7 @@ async fn main() -> beamng_proto::Result<()> {
     // Open the camera sensor with shared-memory streaming
     let camera = Camera::open(
         "camera1",
-        &bng,
+        &mut bng,
         Some(&ego),
         CameraConfig {
             requested_update_time: 0.01,
@@ -88,7 +88,7 @@ async fn main() -> beamng_proto::Result<()> {
         }
     }
 
-    camera.close().await?;
+    camera.close(&mut bng).await?;
     bng.control().resume().await?;
     println!("Done!");
 

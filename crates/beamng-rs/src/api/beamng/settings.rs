@@ -4,12 +4,12 @@ use crate::beamng::BeamNg;
 
 /// API for changing simulator settings.
 pub struct SettingsApi<'a> {
-    pub(crate) bng: &'a BeamNg,
+    pub(crate) bng: &'a mut BeamNg,
 }
 
 impl SettingsApi<'_> {
     /// Change a game setting.
-    pub async fn change(&self, key: &str, value: &str) -> Result<()> {
+    pub async fn change(&mut self, key: &str, value: &str) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -24,7 +24,7 @@ impl SettingsApi<'_> {
     }
 
     /// Apply pending graphics settings.
-    pub async fn apply_graphics(&self) -> Result<()> {
+    pub async fn apply_graphics(&mut self) -> Result<()> {
         self.bng
             .conn()?
             .ack("ApplyGraphicsSetting", "GraphicsSettingApplied", &[])
@@ -33,7 +33,7 @@ impl SettingsApi<'_> {
 
     /// Enable deterministic mode.
     pub async fn set_deterministic(
-        &self,
+        &mut self,
         steps_per_second: Option<i32>,
         speed_factor: Option<i32>,
     ) -> Result<()> {
@@ -57,7 +57,7 @@ impl SettingsApi<'_> {
     }
 
     /// Disable deterministic mode.
-    pub async fn set_nondeterministic(&self) -> Result<()> {
+    pub async fn set_nondeterministic(&mut self) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -69,7 +69,7 @@ impl SettingsApi<'_> {
     }
 
     /// Set the steps per second (temporal resolution).
-    pub async fn set_steps_per_second(&self, sps: i32) -> Result<()> {
+    pub async fn set_steps_per_second(&mut self, sps: i32) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -81,7 +81,7 @@ impl SettingsApi<'_> {
     }
 
     /// Remove the steps-per-second limit.
-    pub async fn remove_step_limit(&self) -> Result<()> {
+    pub async fn remove_step_limit(&mut self) -> Result<()> {
         self.bng
             .conn()?
             .ack("RemoveFPSLimit", "RemovedFPSLimit", &[])
@@ -89,7 +89,7 @@ impl SettingsApi<'_> {
     }
 
     /// Enable or disable visual particle emission.
-    pub async fn set_particles_enabled(&self, enabled: bool) -> Result<()> {
+    pub async fn set_particles_enabled(&mut self, enabled: bool) -> Result<()> {
         self.bng
             .conn()?
             .ack(

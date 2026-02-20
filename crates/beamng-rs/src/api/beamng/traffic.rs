@@ -4,12 +4,12 @@ use crate::beamng::BeamNg;
 
 /// API for controlling traffic in the simulation.
 pub struct TrafficApi<'a> {
-    pub(crate) bng: &'a BeamNg,
+    pub(crate) bng: &'a mut BeamNg,
 }
 
 impl TrafficApi<'_> {
     /// Enable traffic simulation for the given vehicle IDs.
-    pub async fn start(&self, participant_vids: &[&str]) -> Result<()> {
+    pub async fn start(&mut self, participant_vids: &[&str]) -> Result<()> {
         let participants: Vec<rmpv::Value> = participant_vids
             .iter()
             .map(|v| rmpv::Value::from(*v))
@@ -26,7 +26,7 @@ impl TrafficApi<'_> {
 
     /// Spawn traffic vehicles.
     pub async fn spawn(
-        &self,
+        &mut self,
         max_amount: Option<i32>,
         police_ratio: f64,
         extra_amount: Option<i32>,
@@ -50,7 +50,7 @@ impl TrafficApi<'_> {
     }
 
     /// Reset (force teleport) all traffic vehicles away from the player.
-    pub async fn reset(&self) -> Result<()> {
+    pub async fn reset(&mut self) -> Result<()> {
         self.bng
             .conn()?
             .ack("ResetTraffic", "TrafficReset", &[])
@@ -58,7 +58,7 @@ impl TrafficApi<'_> {
     }
 
     /// Stop the traffic simulation.
-    pub async fn stop(&self, stop_vehicles: bool) -> Result<()> {
+    pub async fn stop(&mut self, stop_vehicles: bool) -> Result<()> {
         self.bng
             .conn()?
             .ack(

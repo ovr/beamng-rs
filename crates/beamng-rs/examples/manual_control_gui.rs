@@ -146,12 +146,12 @@ fn main() -> eframe::Result {
             .build()
             .unwrap()
             .block_on(async move {
-                let bng = BeamNg::new("192.168.1.85", 5555).connect().await.unwrap();
+                let mut bng = BeamNg::new("192.168.1.85", 5555).connect().await.unwrap();
                 println!("Connected to BeamNG.tech!");
 
-                let _ = bng.control().return_to_main_menu().await;
+                // let _ = bng.control().return_to_main_menu().await;
                 let _ = Scenario::delete(
-                    &bng,
+                    &mut bng,
                     "/levels/italy/scenarios/manual_control_gui/manual_control_gui.json",
                 )
                 .await;
@@ -167,7 +167,7 @@ fn main() -> eframe::Result {
                         ..Default::default()
                     },
                 );
-                scenario.make(&bng).await.unwrap();
+                scenario.make(&mut bng).await.unwrap();
                 println!("Scenario created.");
 
                 let mut ego = Vehicle::new("ego", "etk800");
@@ -185,7 +185,7 @@ fn main() -> eframe::Result {
 
                 let camera = Camera::open(
                     "camera1",
-                    &bng,
+                    &mut bng,
                     Some(&ego),
                     CameraConfig {
                         requested_update_time: 0.01,
@@ -237,7 +237,7 @@ fn main() -> eframe::Result {
                     }
 
                     // 3. Grab the rendered frame (poll_raw = 1 round-trip vs ad-hoc's 3+)
-                    match camera.poll_raw().await {
+                    match camera.poll_raw(&mut bng).await {
                         Ok(raw) => {
                             if let Some(rgba) = raw.colour.and_then(colour_to_rgba) {
                                 let frame_ms = tick_start.elapsed().as_secs_f64() * 1000.0;

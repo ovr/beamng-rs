@@ -5,7 +5,7 @@ use crate::beamng::BeamNg;
 
 /// API for drawing debug graphical objects in the simulator.
 pub struct DebugApi<'a> {
-    pub(crate) bng: &'a BeamNg,
+    pub(crate) bng: &'a mut BeamNg,
 }
 
 fn vec3_to_value(v: Vec3) -> rmpv::Value {
@@ -28,7 +28,7 @@ fn color_to_value(c: Color) -> rmpv::Value {
 impl DebugApi<'_> {
     /// Add debug spheres at the given coordinates.
     pub async fn add_spheres(
-        &self,
+        &mut self,
         coordinates: &[Vec3],
         radii: &[f64],
         colors: &[Color],
@@ -63,7 +63,7 @@ impl DebugApi<'_> {
     }
 
     /// Remove debug spheres by their IDs.
-    pub async fn remove_spheres(&self, sphere_ids: &[i64]) -> Result<()> {
+    pub async fn remove_spheres(&mut self, sphere_ids: &[i64]) -> Result<()> {
         let ids: Vec<rmpv::Value> = sphere_ids.iter().map(|id| rmpv::Value::from(*id)).collect();
         self.bng
             .conn()?
@@ -80,7 +80,7 @@ impl DebugApi<'_> {
 
     /// Add a debug polyline.
     pub async fn add_polyline(
-        &self,
+        &mut self,
         coordinates: &[Vec3],
         color: Color,
         cling: bool,
@@ -107,7 +107,7 @@ impl DebugApi<'_> {
     }
 
     /// Remove a debug polyline by ID.
-    pub async fn remove_polyline(&self, line_id: i64) -> Result<()> {
+    pub async fn remove_polyline(&mut self, line_id: i64) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -126,7 +126,7 @@ impl DebugApi<'_> {
 
     /// Add a debug cylinder between two circle centers.
     pub async fn add_cylinder(
-        &self,
+        &mut self,
         circle_positions: &[Vec3; 2],
         radius: f64,
         color: Color,
@@ -152,7 +152,7 @@ impl DebugApi<'_> {
     }
 
     /// Remove a debug cylinder by ID.
-    pub async fn remove_cylinder(&self, cylinder_id: i64) -> Result<()> {
+    pub async fn remove_cylinder(&mut self, cylinder_id: i64) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -171,7 +171,7 @@ impl DebugApi<'_> {
 
     /// Add a debug triangle.
     pub async fn add_triangle(
-        &self,
+        &mut self,
         vertices: &[Vec3; 3],
         color: Color,
         cling: bool,
@@ -198,7 +198,7 @@ impl DebugApi<'_> {
     }
 
     /// Remove a debug triangle by ID.
-    pub async fn remove_triangle(&self, triangle_id: i64) -> Result<()> {
+    pub async fn remove_triangle(&mut self, triangle_id: i64) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -217,7 +217,7 @@ impl DebugApi<'_> {
 
     /// Add a debug rectangle.
     pub async fn add_rectangle(
-        &self,
+        &mut self,
         vertices: &[Vec3; 4],
         color: Color,
         cling: bool,
@@ -244,7 +244,7 @@ impl DebugApi<'_> {
     }
 
     /// Remove a debug rectangle by ID.
-    pub async fn remove_rectangle(&self, rectangle_id: i64) -> Result<()> {
+    pub async fn remove_rectangle(&mut self, rectangle_id: i64) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -263,7 +263,7 @@ impl DebugApi<'_> {
 
     /// Add debug text at a position.
     pub async fn add_text(
-        &self,
+        &mut self,
         origin: Vec3,
         content: &str,
         color: Color,
@@ -291,7 +291,7 @@ impl DebugApi<'_> {
     }
 
     /// Remove debug text by ID.
-    pub async fn remove_text(&self, text_id: i64) -> Result<()> {
+    pub async fn remove_text(&mut self, text_id: i64) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -310,7 +310,7 @@ impl DebugApi<'_> {
 
     /// Add a debug square prism.
     pub async fn add_square_prism(
-        &self,
+        &mut self,
         end_points: &[Vec3; 2],
         end_point_dims: &[Float2; 2],
         color: Color,
@@ -339,7 +339,7 @@ impl DebugApi<'_> {
     }
 
     /// Remove a debug square prism by ID.
-    pub async fn remove_square_prism(&self, prism_id: i64) -> Result<()> {
+    pub async fn remove_square_prism(&mut self, prism_id: i64) -> Result<()> {
         self.bng
             .conn()?
             .ack(

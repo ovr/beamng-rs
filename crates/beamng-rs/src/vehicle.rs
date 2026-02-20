@@ -100,24 +100,24 @@ impl Vehicle {
 
     /// Send a request over the per-vehicle connection.
     pub(crate) async fn send_vehicle_request(
-        &self,
+        &mut self,
         req_type: &str,
         fields: &[(&str, rmpv::Value)],
     ) -> beamng_proto::Result<StrDict> {
         let conn = self
             .connection
-            .as_ref()
+            .as_mut()
             .ok_or_else(|| beamng_proto::BngError::Disconnected("Vehicle not connected".into()))?;
         conn.request(req_type, fields).await
     }
 
     /// Access the AI control API for this vehicle.
-    pub fn ai(&self) -> AIApi<'_> {
+    pub fn ai(&mut self) -> AIApi<'_> {
         AIApi { vehicle: self }
     }
 
     /// Access the root-level vehicle API (position, bounding box, direct control).
-    pub fn root(&self) -> RootApi<'_> {
+    pub fn root(&mut self) -> RootApi<'_> {
         RootApi { vehicle: self }
     }
 

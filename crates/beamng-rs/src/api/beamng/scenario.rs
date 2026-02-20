@@ -7,17 +7,17 @@ use crate::vehicle::Vehicle;
 
 /// API for working with scenarios, levels and scenario objects.
 pub struct ScenarioApi<'a> {
-    pub(crate) bng: &'a BeamNg,
+    pub(crate) bng: &'a mut BeamNg,
 }
 
 impl ScenarioApi<'_> {
     /// Query available levels.
-    pub async fn get_levels(&self) -> Result<Option<rmpv::Value>> {
+    pub async fn get_levels(&mut self) -> Result<Option<rmpv::Value>> {
         self.bng.conn()?.message("GetLevels", &[]).await
     }
 
     /// Query available scenarios, optionally filtered by level names.
-    pub async fn get_scenarios(&self, levels: &[&str]) -> Result<Option<rmpv::Value>> {
+    pub async fn get_scenarios(&mut self, levels: &[&str]) -> Result<Option<rmpv::Value>> {
         let levels_val: Vec<rmpv::Value> = levels.iter().map(|l| rmpv::Value::from(*l)).collect();
         self.bng
             .conn()?
@@ -29,7 +29,7 @@ impl ScenarioApi<'_> {
     }
 
     /// Get the name of the currently loaded scenario.
-    pub async fn get_name(&self) -> Result<String> {
+    pub async fn get_name(&mut self) -> Result<String> {
         let resp = self.bng.conn()?.request("GetScenarioName", &[]).await?;
         resp.get("name")
             .and_then(|v| v.as_str())
@@ -44,7 +44,7 @@ impl ScenarioApi<'_> {
     /// the player vehicle, and establishes per-vehicle TCP connections —
     /// exactly like Python's `scenario.load()`.
     pub async fn load_scenario(
-        &self,
+        &mut self,
         scenario: &Scenario,
         precompile_shaders: bool,
         vehicles: &mut [&mut Vehicle],
@@ -65,7 +65,7 @@ impl ScenarioApi<'_> {
     }
 
     /// Load a scenario by its path.
-    pub async fn load(&self, path: &str, precompile_shaders: bool) -> Result<()> {
+    pub async fn load(&mut self, path: &str, precompile_shaders: bool) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -80,7 +80,7 @@ impl ScenarioApi<'_> {
     }
 
     /// Start the currently loaded scenario.
-    pub async fn start(&self, restrict_actions: bool) -> Result<()> {
+    pub async fn start(&mut self, restrict_actions: bool) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -92,7 +92,7 @@ impl ScenarioApi<'_> {
     }
 
     /// Restart the currently running scenario.
-    pub async fn restart(&self, restrict_actions: bool) -> Result<()> {
+    pub async fn restart(&mut self, restrict_actions: bool) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -104,7 +104,7 @@ impl ScenarioApi<'_> {
     }
 
     /// Stop the current scenario and return to the main menu.
-    pub async fn stop(&self) -> Result<()> {
+    pub async fn stop(&mut self) -> Result<()> {
         self.bng
             .conn()?
             .ack("StopScenario", "ScenarioStopped", &[])
@@ -112,13 +112,13 @@ impl ScenarioApi<'_> {
     }
 
     /// Get the current scenario info.
-    pub async fn get_current(&self) -> Result<Option<rmpv::Value>> {
+    pub async fn get_current(&mut self) -> Result<Option<rmpv::Value>> {
         self.bng.conn()?.message("GetCurrentScenario", &[]).await
     }
 
     /// Retrieve the road network data.
     pub async fn get_road_network(
-        &self,
+        &mut self,
         include_edges: bool,
         drivable_only: bool,
     ) -> Result<StrDict> {
@@ -135,7 +135,7 @@ impl ScenarioApi<'_> {
     }
 
     /// Retrieve edges of a named road.
-    pub async fn get_road_edges(&self, road: &str) -> Result<StrDict> {
+    pub async fn get_road_edges(&mut self, road: &str) -> Result<StrDict> {
         self.bng
             .conn()?
             .request("GetDecalRoadEdges", &[("road", rmpv::Value::from(road))])
@@ -143,7 +143,7 @@ impl ScenarioApi<'_> {
     }
 
     /// Find objects of a given class.
-    pub async fn find_objects_class(&self, class: &str) -> Result<StrDict> {
+    pub async fn find_objects_class(&mut self, class: &str) -> Result<StrDict> {
         self.bng
             .conn()?
             .request("FindObjectsClass", &[("class", rmpv::Value::from(class))])
@@ -152,7 +152,7 @@ impl ScenarioApi<'_> {
 
     /// Teleport a scenario object.
     pub async fn teleport_object(
-        &self,
+        &mut self,
         id: i64,
         pos: beamng_proto::types::Vec3,
         rot_quat: Option<beamng_proto::types::Quat>,
@@ -190,7 +190,7 @@ impl ScenarioApi<'_> {
     }
 
     /// Load a TrackBuilder track.
-    pub async fn load_trackbuilder_track(&self, path: &str) -> Result<()> {
+    pub async fn load_trackbuilder_track(&mut self, path: &str) -> Result<()> {
         self.bng
             .conn()?
             .ack(

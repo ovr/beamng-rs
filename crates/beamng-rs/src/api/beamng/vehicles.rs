@@ -6,13 +6,13 @@ use crate::vehicle::Vehicle;
 
 /// API for vehicle manipulation in the simulator.
 pub struct VehiclesApi<'a> {
-    pub(crate) bng: &'a BeamNg,
+    pub(crate) bng: &'a mut BeamNg,
 }
 
 impl VehiclesApi<'_> {
     /// Start a per-vehicle connection. Returns the dynamic port info from the simulator.
     pub async fn start_connection(
-        &self,
+        &mut self,
         vehicle: &Vehicle,
         extensions: Option<&[String]>,
     ) -> Result<StrDict> {
@@ -29,7 +29,7 @@ impl VehiclesApi<'_> {
 
     /// Spawn a vehicle in the simulation at the given position.
     pub async fn spawn(
-        &self,
+        &mut self,
         vehicle: &mut Vehicle,
         pos: Vec3,
         rot_quat: Quat,
@@ -81,7 +81,7 @@ impl VehiclesApi<'_> {
     }
 
     /// Establish a per-vehicle TCP connection.
-    pub async fn connect_vehicle(&self, vehicle: &mut Vehicle) -> Result<()> {
+    pub async fn connect_vehicle(&mut self, vehicle: &mut Vehicle) -> Result<()> {
         let resp = self
             .start_connection(vehicle, vehicle.options.extensions.as_deref())
             .await?;
@@ -104,7 +104,7 @@ impl VehiclesApi<'_> {
     }
 
     /// Despawn a vehicle from the simulation.
-    pub async fn despawn(&self, vehicle: &mut Vehicle) -> Result<()> {
+    pub async fn despawn(&mut self, vehicle: &mut Vehicle) -> Result<()> {
         vehicle.disconnect();
         self.bng
             .conn()?
@@ -117,13 +117,13 @@ impl VehiclesApi<'_> {
     }
 
     /// Retrieve a dictionary of available vehicle models.
-    pub async fn get_available(&self) -> Result<StrDict> {
+    pub async fn get_available(&mut self) -> Result<StrDict> {
         self.bng.conn()?.request("GetAvailableVehicles", &[]).await
     }
 
     /// Teleport a vehicle to a new position.
     pub async fn teleport(
-        &self,
+        &mut self,
         vid: &str,
         pos: Vec3,
         rot_quat: Option<Quat>,
@@ -161,7 +161,7 @@ impl VehiclesApi<'_> {
     }
 
     /// Switch the active (player-focused) vehicle.
-    pub async fn switch(&self, vid: &str) -> Result<()> {
+    pub async fn switch(&mut self, vid: &str) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -173,7 +173,7 @@ impl VehiclesApi<'_> {
     }
 
     /// Wait for a vehicle with the given name to spawn.
-    pub async fn await_spawn(&self, vid: &str) -> Result<()> {
+    pub async fn await_spawn(&mut self, vid: &str) -> Result<()> {
         self.bng
             .conn()?
             .request("WaitForSpawn", &[("name", rmpv::Value::from(vid))])
@@ -182,7 +182,7 @@ impl VehiclesApi<'_> {
     }
 
     /// Get the states of the given vehicles (position, direction, velocity).
-    pub async fn get_states(&self, vids: &[&str]) -> Result<StrDict> {
+    pub async fn get_states(&mut self, vids: &[&str]) -> Result<StrDict> {
         let vehicles: Vec<rmpv::Value> = vids.iter().map(|v| rmpv::Value::from(*v)).collect();
         let resp = self
             .bng
@@ -196,7 +196,7 @@ impl VehiclesApi<'_> {
     }
 
     /// Query the currently active vehicles in the simulator.
-    pub async fn get_current_info(&self, include_config: bool) -> Result<Option<rmpv::Value>> {
+    pub async fn get_current_info(&mut self, include_config: bool) -> Result<Option<rmpv::Value>> {
         self.bng
             .conn()?
             .message(
@@ -207,12 +207,12 @@ impl VehiclesApi<'_> {
     }
 
     /// Get the current player vehicle ID.
-    pub async fn get_player_vehicle_id(&self) -> Result<StrDict> {
+    pub async fn get_player_vehicle_id(&mut self) -> Result<StrDict> {
         self.bng.conn()?.request("GetPlayerVehicleID", &[]).await
     }
 
     /// Set a vehicle's license plate text.
-    pub async fn set_license_plate(&self, vid: &str, text: &str) -> Result<()> {
+    pub async fn set_license_plate(&mut self, vid: &str, text: &str) -> Result<()> {
         self.bng
             .conn()?
             .ack(

@@ -28,10 +28,10 @@ pub struct ScenarioVehicle {
 /// use beamng_rs::{BeamNg, Scenario};
 /// use beamng_rs::vehicle::VehicleOptions;
 ///
-/// let bng = BeamNg::new("localhost", 25252).connect().await?;
+/// let mut bng = BeamNg::new("localhost", 25252).connect().await?;
 /// let mut scenario = Scenario::new("italy", "my_scenario");
 /// scenario.add_vehicle("ego", "etk800", (0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0), VehicleOptions::default());
-/// scenario.make(&bng).await?;
+/// scenario.make(&mut bng).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -88,7 +88,7 @@ impl Scenario {
     /// Delete a previously-created scenario from the simulator's filesystem.
     ///
     /// Useful to clean up stale scenarios before re-creating them.
-    pub async fn delete(bng: &BeamNg, path: &str) -> Result<()> {
+    pub async fn delete(bng: &mut BeamNg, path: &str) -> Result<()> {
         bng.conn()?
             .message("DeleteScenario", &[("path", rmpv::Value::from(path))])
             .await?;
@@ -99,7 +99,7 @@ impl Scenario {
     ///
     /// Generates a prefab JSON and info dict, sends a `CreateScenario` message,
     /// and stores the returned path.
-    pub async fn make(&mut self, bng: &BeamNg) -> Result<()> {
+    pub async fn make(&mut self, bng: &mut BeamNg) -> Result<()> {
         if self.path.is_some() {
             return Err(BngError::ValueError(
                 "This scenario already has an info file.".into(),

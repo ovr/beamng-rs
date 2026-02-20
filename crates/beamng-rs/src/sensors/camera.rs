@@ -113,37 +113,36 @@ fn value_to_bytes(val: &rmpv::Value) -> Option<Vec<u8>> {
 /// use beamng_rs::BeamNg;
 /// use beamng_rs::sensors::{Camera, CameraConfig};
 ///
-/// let bng = BeamNg::new("localhost", 25252).connect().await?;
-/// let camera = Camera::open("cam1", &bng, None, CameraConfig {
+/// let mut bng = BeamNg::new("localhost", 25252).connect().await?;
+/// let camera = Camera::open("cam1", &mut bng, None, CameraConfig {
 ///     is_using_shared_memory: true,
 ///     is_streaming: true,
 ///     resolution: (1024, 1024),
 ///     ..Default::default()
 /// }).await?;
 /// let raw = camera.stream_raw()?;
-/// camera.close().await?;
+/// camera.close(&mut bng).await?;
 /// # Ok(())
 /// # }
 /// ```
-pub struct Camera<'a> {
+pub struct Camera {
     name: String,
-    bng: &'a BeamNg,
     config: CameraConfig,
     colour_shmem: Option<ShmemBuffer>,
     annotation_shmem: Option<ShmemBuffer>,
     depth_shmem: Option<ShmemBuffer>,
 }
 
-impl<'a> Camera<'a> {
+impl Camera {
     /// Open a camera sensor in the simulator.
     ///
     /// Creates shared memory buffers (if configured) and sends `OpenCamera` to the simulator.
     pub async fn open(
         name: impl Into<String>,
-        bng: &'a BeamNg,
+        bng: &mut BeamNg,
         vehicle: Option<&Vehicle>,
         config: CameraConfig,
-    ) -> Result<Camera<'a>> {
+    ) -> Result<Camera> {
         let name = name.into();
         let buf_size = (config.resolution.0 * config.resolution.1 * 4) as usize;
 
@@ -289,7 +288,6 @@ impl<'a> Camera<'a> {
 
         Ok(Camera {
             name,
-            bng,
             config,
             colour_shmem,
             annotation_shmem,
@@ -325,8 +323,8 @@ impl<'a> Camera<'a> {
     /// When shared memory is enabled, sends a `PollCamera` request and then reads from
     /// the local shared memory buffers. When shared memory is disabled, the image data
     /// is returned directly in the network response (required for remote connections).
-    pub async fn poll_raw(&self) -> Result<CameraRawReadings> {
-        let conn = self.bng.conn()?;
+    pub async fn poll_raw(&self, bng: &mut BeamNg) -> Result<CameraRawReadings> {
+        let conn = bng.conn()?;
         let resp = conn
             .request(
                 "PollCamera",
@@ -380,8 +378,8 @@ impl<'a> Camera<'a> {
     /// Unlike [`poll_raw`](Self::poll_raw) which returns cached data, this triggers
     /// a fresh render on the simulator side and waits for it to complete.
     /// Works over the network without shared memory.
-    pub async fn ad_hoc_poll_raw(&self) -> Result<CameraRawReadings> {
-        let conn = self.bng.conn()?;
+    pub async fn ad_hoc_poll_raw(&self, bng: &mut BeamNg) -> Result<CameraRawReadings> {
+        let conn = bng.conn()?;
 
         // 1. Request a render
         let resp = conn
@@ -397,6 +395,7 @@ impl<'a> Camera<'a> {
 
         // 2. Wait until the render is ready
         loop {
+            let conn = bng.conn()?;
             let resp = conn
                 .request(
                     "IsAdHocPollRequestReadyCamera",
@@ -411,6 +410,7 @@ impl<'a> Camera<'a> {
         }
 
         // 3. Collect the rendered data
+        let conn = bng.conn()?;
         let resp = conn
             .request(
                 "CollectAdHocPollRequestCamera",
@@ -440,9 +440,8 @@ impl<'a> Camera<'a> {
     }
 
     /// Close the camera sensor and release shared memory.
-    pub async fn close(self) -> Result<()> {
-        self.bng
-            .conn()?
+    pub async fn close(self, bng: &mut BeamNg) -> Result<()> {
+        bng.conn()?
             .ack(
                 "CloseCamera",
                 "ClosedCamera",

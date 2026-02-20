@@ -5,18 +5,18 @@ use crate::beamng::BeamNg;
 
 /// API for controlling in-game environment variables: time of day, weather, gravity.
 pub struct EnvironmentApi<'a> {
-    pub(crate) bng: &'a BeamNg,
+    pub(crate) bng: &'a mut BeamNg,
 }
 
 impl EnvironmentApi<'_> {
     /// Get the current time-of-day object.
-    pub async fn get_tod(&self) -> Result<StrDict> {
+    pub async fn get_tod(&mut self) -> Result<StrDict> {
         self.bng.conn()?.request("GetTimeOfDay", &[]).await
     }
 
     /// Set the time of day and related parameters.
     pub async fn set_tod(
-        &self,
+        &mut self,
         tod: Option<f64>,
         play: Option<bool>,
         day_scale: Option<f64>,
@@ -50,7 +50,7 @@ impl EnvironmentApi<'_> {
     }
 
     /// Set a weather preset.
-    pub async fn set_weather_preset(&self, preset: &str, time: f64) -> Result<()> {
+    pub async fn set_weather_preset(&mut self, preset: &str, time: f64) -> Result<()> {
         self.bng
             .conn()?
             .ack(
@@ -65,7 +65,7 @@ impl EnvironmentApi<'_> {
     }
 
     /// Get the current gravity value.
-    pub async fn get_gravity(&self) -> Result<f64> {
+    pub async fn get_gravity(&mut self) -> Result<f64> {
         let resp = self.bng.conn()?.request("GetGravity", &[]).await?;
         resp.get("gravity")
             .and_then(|v| v.as_f64())
@@ -73,7 +73,7 @@ impl EnvironmentApi<'_> {
     }
 
     /// Set the gravity value. Earth default is -9.807.
-    pub async fn set_gravity(&self, gravity: f64) -> Result<()> {
+    pub async fn set_gravity(&mut self, gravity: f64) -> Result<()> {
         self.bng
             .conn()?
             .ack(

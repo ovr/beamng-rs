@@ -13,7 +13,7 @@ async fn main() -> beamng_proto::Result<()> {
     tracing_subscriber::fmt::init();
 
     // Connect to the simulator.
-    let bng = BeamNg::new("172.29.160.1", 5555).connect().await?;
+    let mut bng = BeamNg::new("172.29.160.1", 5555).connect().await?;
     println!("Connected to BeamNG.tech!");
 
     // Pause the simulation.

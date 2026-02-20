@@ -5,12 +5,12 @@ use crate::vehicle::Vehicle;
 
 /// Root-level vehicle API for direct vehicle control and info.
 pub struct RootApi<'a> {
-    pub(crate) vehicle: &'a Vehicle,
+    pub(crate) vehicle: &'a mut Vehicle,
 }
 
 impl RootApi<'_> {
     /// Set the vehicle's position and optional rotation.
-    pub async fn set_position(&self, pos: Vec3, rot: Option<Quat>) -> Result<()> {
+    pub async fn set_position(&mut self, pos: Vec3, rot: Option<Quat>) -> Result<()> {
         let mut fields: Vec<(&str, rmpv::Value)> = vec![(
             "pos",
             rmpv::Value::Array(vec![
@@ -37,7 +37,7 @@ impl RootApi<'_> {
     }
 
     /// Get the vehicle's bounding box.
-    pub async fn get_bbox(&self) -> Result<StrDict> {
+    pub async fn get_bbox(&mut self) -> Result<StrDict> {
         self.vehicle
             .send_vehicle_request("GetBBoxPoints", &[])
             .await
@@ -45,7 +45,7 @@ impl RootApi<'_> {
 
     /// Apply vehicle input (steering, throttle, brake, etc.).
     pub async fn control(
-        &self,
+        &mut self,
         steering: Option<f64>,
         throttle: Option<f64>,
         brake: Option<f64>,

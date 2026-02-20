@@ -5,12 +5,18 @@ use crate::beamng::BeamNg;
 
 /// API for getting info about the host system running the simulator.
 pub struct SystemApi<'a> {
-    pub(crate) bng: &'a BeamNg,
+    pub(crate) bng: &'a mut BeamNg,
 }
 
 impl SystemApi<'_> {
     /// Returns information about the host's system.
-    pub async fn get_info(&self, os: bool, cpu: bool, gpu: bool, power: bool) -> Result<StrDict> {
+    pub async fn get_info(
+        &mut self,
+        os: bool,
+        cpu: bool,
+        gpu: bool,
+        power: bool,
+    ) -> Result<StrDict> {
         self.bng
             .conn()?
             .request(
@@ -26,7 +32,7 @@ impl SystemApi<'_> {
     }
 
     /// Returns the environment filesystem paths of the BeamNG simulator.
-    pub async fn get_environment_paths(&self) -> Result<StrDict> {
+    pub async fn get_environment_paths(&mut self) -> Result<StrDict> {
         self.bng.conn()?.request("GetEnvironmentPaths", &[]).await
     }
 }

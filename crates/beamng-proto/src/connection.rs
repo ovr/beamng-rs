@@ -1,9 +1,7 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use tokio::io::{ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
-use tokio::sync::Mutex;
 use tracing::{debug, info};
 
 use crate::error::{BngError, Result};
@@ -18,11 +16,11 @@ pub const PROTOCOL_VERSION: &str = "v1.26";
 /// Handles TCP framing, msgpack serialization, hello handshake,
 /// and request/response correlation via `_id` fields.
 pub struct Connection {
-    reader: Mutex<ReadHalf<TcpStream>>,
-    writer: Mutex<WriteHalf<TcpStream>>,
-    req_id: AtomicU64,
+    reader: ReadHalf<TcpStream>,
+    writer: WriteHalf<TcpStream>,
+    req_id: u64,
     /// Buffer for out-of-order responses (keyed by their `_id`).
-    buffered: Mutex<HashMap<u64, ResponsePayload>>,
+    buffered: HashMap<u64, ResponsePayload>,
 }
 
 /// The payload of a successfully received response, or an error from the sim.
@@ -41,11 +39,11 @@ impl Connection {
         stream.set_nodelay(true)?;
 
         let (reader, writer) = tokio::io::split(stream);
-        let conn = Self {
-            reader: Mutex::new(reader),
-            writer: Mutex::new(writer),
-            req_id: AtomicU64::new(0),
-            buffered: Mutex::new(HashMap::new()),
+        let mut conn = Self {
+            reader,
+            writer,
+            req_id: 0,
+            buffered: HashMap::new(),
         };
 
         conn.hello().await?;
@@ -57,11 +55,11 @@ impl Connection {
     pub async fn from_stream(stream: TcpStream) -> Result<Self> {
         stream.set_nodelay(true)?;
         let (reader, writer) = tokio::io::split(stream);
-        let conn = Self {
-            reader: Mutex::new(reader),
-            writer: Mutex::new(writer),
-            req_id: AtomicU64::new(0),
-            buffered: Mutex::new(HashMap::new()),
+        let mut conn = Self {
+            reader,
+            writer,
+            req_id: 0,
+            buffered: HashMap::new(),
         };
 
         conn.hello().await?;
@@ -69,7 +67,7 @@ impl Connection {
     }
 
     /// Perform the Hello handshake, verifying protocol version.
-    async fn hello(&self) -> Result<()> {
+    async fn hello(&mut self) -> Result<()> {
         let resp = self
             .request(
                 "Hello",
@@ -101,21 +99,31 @@ impl Connection {
     }
 
     /// Allocate the next request ID.
-    fn next_id(&self) -> u64 {
-        self.req_id.fetch_add(1, Ordering::Relaxed)
+    fn next_id(&mut self) -> u64 {
+        let id = self.req_id;
+        self.req_id += 1;
+        id
     }
 
     /// Send a request and wait for the correlated response.
     ///
     /// The `req_type` becomes the `"type"` field.
     /// Additional fields are passed as `fields`.
-    pub async fn request(&self, req_type: &str, fields: &[(&str, rmpv::Value)]) -> Result<StrDict> {
+    pub async fn request(
+        &mut self,
+        req_type: &str,
+        fields: &[(&str, rmpv::Value)],
+    ) -> Result<StrDict> {
         let req_id = self.send_raw(req_type, fields).await?;
         self.recv(req_id).await
     }
 
     /// Send a request and return the assigned request ID without waiting for a response.
-    pub async fn send_raw(&self, req_type: &str, fields: &[(&str, rmpv::Value)]) -> Result<u64> {
+    pub async fn send_raw(
+        &mut self,
+        req_type: &str,
+        fields: &[(&str, rmpv::Value)],
+    ) -> Result<u64> {
         let req_id = self.next_id();
 
         let mut pairs: Vec<(rmpv::Value, rmpv::Value)> = Vec::with_capacity(fields.len() + 2);
@@ -131,8 +139,7 @@ impl Connection {
             .map_err(|e| BngError::Io(std::io::Error::other(e)))?;
         debug!("Sending {req_type} (id={req_id})");
 
-        let mut writer = self.writer.lock().await;
-        write_frame(&mut *writer, &packed).await?;
+        write_frame(&mut self.writer, &packed).await?;
 
         Ok(req_id)
     }
@@ -140,16 +147,13 @@ impl Connection {
     /// Wait for a response with the given request ID.
     ///
     /// If a response with a different ID arrives, it is buffered for later retrieval.
-    pub async fn recv(&self, req_id: u64) -> Result<StrDict> {
+    pub async fn recv(&mut self, req_id: u64) -> Result<StrDict> {
         // Check the buffer first.
-        {
-            let mut buffered = self.buffered.lock().await;
-            if let Some(payload) = buffered.remove(&req_id) {
-                return match payload {
-                    ResponsePayload::Ok(dict) => Ok(dict),
-                    ResponsePayload::SimError(e) => Err(e),
-                };
-            }
+        if let Some(payload) = self.buffered.remove(&req_id) {
+            return match payload {
+                ResponsePayload::Ok(dict) => Ok(dict),
+                ResponsePayload::SimError(e) => Err(e),
+            };
         }
 
         // Read frames until we find ours.
@@ -174,13 +178,13 @@ impl Connection {
                 Some(e) => ResponsePayload::SimError(e),
                 None => ResponsePayload::Ok(dict),
             };
-            self.buffered.lock().await.insert(msg_id, stored);
+            self.buffered.insert(msg_id, stored);
         }
     }
 
     /// Send a typed request and verify the response type matches (ack pattern).
     pub async fn ack(
-        &self,
+        &mut self,
         req_type: &str,
         ack_type: &str,
         fields: &[(&str, rmpv::Value)],
@@ -199,7 +203,7 @@ impl Connection {
     /// High-level message helper: sends a typed request with kwargs,
     /// checks response type matches, and returns the `"result"` field if present.
     pub async fn message(
-        &self,
+        &mut self,
         req_type: &str,
         fields: &[(&str, rmpv::Value)],
     ) -> Result<Option<rmpv::Value>> {
@@ -215,10 +219,8 @@ impl Connection {
     }
 
     /// Read and decode one msgpack message from the wire.
-    async fn read_one_message(&self) -> Result<StrDict> {
-        let mut reader = self.reader.lock().await;
-        let data = read_frame(&mut *reader).await?;
-        drop(reader);
+    async fn read_one_message(&mut self) -> Result<StrDict> {
+        let data = read_frame(&mut self.reader).await?;
 
         let value = rmpv::decode::read_value(&mut &data[..])
             .map_err(|e| BngError::Io(std::io::Error::other(e)))?;
@@ -296,7 +298,7 @@ mod tests {
         server.await.unwrap();
 
         // Connection should have id counter at 1 after hello.
-        assert_eq!(conn.req_id.load(Ordering::Relaxed), 1);
+        assert_eq!(conn.req_id, 1);
     }
 
     #[tokio::test]
@@ -393,13 +395,12 @@ mod tests {
             write_frame(&mut writer, &encode(&resp)).await.unwrap();
         });
 
-        let conn = Connection::open("127.0.0.1", addr.port()).await.unwrap();
+        let mut conn = Connection::open("127.0.0.1", addr.port()).await.unwrap();
         let resp = conn.request("Pause", &[]).await.unwrap();
         assert_eq!(resp.get("type").unwrap().as_str().unwrap(), "Paused");
 
         // The out-of-order message should be buffered.
-        let buffered = conn.buffered.lock().await;
-        assert!(buffered.contains_key(&99));
+        assert!(conn.buffered.contains_key(&99));
 
         server.await.unwrap();
     }

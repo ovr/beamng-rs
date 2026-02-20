@@ -4,12 +4,12 @@ use crate::vehicle::Vehicle;
 
 /// API for controlling vehicle AI behavior.
 pub struct AIApi<'a> {
-    pub(crate) vehicle: &'a Vehicle,
+    pub(crate) vehicle: &'a mut Vehicle,
 }
 
 impl AIApi<'_> {
     /// Set the AI mode (e.g. "disabled", "span", "manual", "traffic", "flee", "chase", "random").
-    pub async fn set_mode(&self, mode: &str) -> Result<()> {
+    pub async fn set_mode(&mut self, mode: &str) -> Result<()> {
         self.vehicle
             .send_vehicle_request("SetAiMode", &[("mode", rmpv::Value::from(mode))])
             .await?;
@@ -17,7 +17,7 @@ impl AIApi<'_> {
     }
 
     /// Set the AI target speed in m/s.
-    pub async fn set_speed(&self, speed: f64, mode: &str) -> Result<()> {
+    pub async fn set_speed(&mut self, speed: f64, mode: &str) -> Result<()> {
         self.vehicle
             .send_vehicle_request(
                 "SetAiSpeed",
@@ -31,7 +31,7 @@ impl AIApi<'_> {
     }
 
     /// Set a waypoint for the AI to navigate to.
-    pub async fn set_waypoint(&self, waypoint: &str) -> Result<()> {
+    pub async fn set_waypoint(&mut self, waypoint: &str) -> Result<()> {
         self.vehicle
             .send_vehicle_request("SetAiTarget", &[("waypoint", rmpv::Value::from(waypoint))])
             .await?;
@@ -39,7 +39,7 @@ impl AIApi<'_> {
     }
 
     /// Make the AI drive in lane.
-    pub async fn drive_in_lane(&self, lane: bool) -> Result<()> {
+    pub async fn drive_in_lane(&mut self, lane: bool) -> Result<()> {
         self.vehicle
             .send_vehicle_request(
                 "SetDriveInLane",
@@ -50,7 +50,7 @@ impl AIApi<'_> {
     }
 
     /// Set AI aggression (0.0 - 1.0).
-    pub async fn set_aggression(&self, aggression: f64) -> Result<()> {
+    pub async fn set_aggression(&mut self, aggression: f64) -> Result<()> {
         self.vehicle
             .send_vehicle_request(
                 "SetAiAggression",
