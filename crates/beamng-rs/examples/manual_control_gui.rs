@@ -13,7 +13,7 @@ const H: usize = 720;
 const STEPS_PER_FRAME: u32 = 3;
 
 struct Frame {
-    rgba: Vec<u8>,
+    colour: Vec<u8>,
     frame_ms: f64,
 }
 
@@ -32,12 +32,14 @@ struct App {
     texture: Option<egui::TextureHandle>,
     fps: f64,
     frame_ms: f64,
+    convert_ms: f64,
 }
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Drain channel, keep only the latest frame
         let mut latest = None;
+
         while let Ok(f) = self.frame_rx.try_recv() {
             latest = Some(f);
         }
@@ -48,7 +50,9 @@ impl eframe::App for App {
             if frame.frame_ms > 0.0 {
                 self.fps = 1000.0 / frame.frame_ms;
             }
-            let img = egui::ColorImage::from_rgba_unmultiplied([W, H], &frame.rgba);
+            let cvt_start = Instant::now();
+            let img = colour_to_image(frame.colour);
+            self.convert_ms = cvt_start.elapsed().as_secs_f64() * 1000.0;
             match &mut self.texture {
                 Some(h) => h.set(img, egui::TextureOptions::LINEAR),
                 None => {
@@ -92,7 +96,10 @@ impl eframe::App for App {
                 // FPS overlay in top-left corner of the image
                 let rect = response.rect;
                 let painter = ui.painter();
-                let text = format!("{:.0} fps  |  {:.1} ms", self.fps, self.frame_ms);
+                let text = format!(
+                    "{:.0} fps  |  {:.1} ms  |  cvt {:.2} ms",
+                    self.fps, self.frame_ms, self.convert_ms
+                );
                 painter.text(
                     rect.left_top() + egui::vec2(8.0, 8.0),
                     egui::Align2::LEFT_TOP,
@@ -111,25 +118,28 @@ impl eframe::App for App {
     }
 }
 
-/// Convert raw colour bytes to RGBA suitable for egui.
-fn colour_to_rgba(colour: Vec<u8>) -> Option<Vec<u8>> {
+/// Convert raw colour bytes to an egui ColorImage.
+fn colour_to_image(colour: Vec<u8>) -> egui::ColorImage {
     let expected_rgb = W * H * 3;
     let expected_rgba = W * H * 4;
+
     if colour.len() == expected_rgb {
-        let mut buf = Vec::with_capacity(expected_rgba);
-        for px in colour.chunks_exact(3) {
-            buf.extend_from_slice(px);
-            buf.push(255);
-        }
-        Some(buf)
+        egui::ColorImage::from_rgb([W, H], &colour)
     } else if colour.len() == expected_rgba {
         let mut buf = colour;
-        for px in buf.chunks_exact_mut(4) {
-            px[3] = 255;
+
+        for a in buf.iter_mut().skip(3).step_by(4) {
+            *a = 255;
         }
-        Some(buf)
+
+        egui::ColorImage::from_rgba_unmultiplied([W, H], &buf)
     } else {
-        None
+        panic!(
+            "unexpected colour buffer size: {} (expected {} or {})",
+            colour.len(),
+            expected_rgb,
+            expected_rgba
+        );
     }
 }
 
@@ -137,7 +147,7 @@ fn main() -> eframe::Result {
     tracing_subscriber::fmt::init();
 
     let (frame_tx, frame_rx) = mpsc::channel::<Frame>(2);
-    let (control_tx, mut control_rx) = mpsc::channel(16);
+    let (control_tx, mut control_rx) = mpsc::channel(64);
 
     // Background thread: tokio runtime with BeamNG connection
     std::thread::spawn(move || {
@@ -150,11 +160,11 @@ fn main() -> eframe::Result {
                 println!("Connected to BeamNG.tech!");
 
                 // let _ = bng.control().return_to_main_menu().await;
-                let _ = Scenario::delete(
-                    &mut bng,
-                    "/levels/italy/scenarios/manual_control_gui/manual_control_gui.json",
-                )
-                .await;
+                // let _ = Scenario::delete(
+                //     &mut bng,
+                //     "/levels/italy/scenarios/manual_control_gui/manual_control_gui.json",
+                // )
+                // .await;
 
                 let mut scenario = Scenario::new("italy", "manual_control_gui");
                 scenario.add_vehicle(
@@ -239,9 +249,9 @@ fn main() -> eframe::Result {
                     // 3. Grab the rendered frame (poll_raw = 1 round-trip vs ad-hoc's 3+)
                     match camera.poll_raw(&mut bng).await {
                         Ok(raw) => {
-                            if let Some(rgba) = raw.colour.and_then(colour_to_rgba) {
+                            if let Some(colour) = raw.colour {
                                 let frame_ms = tick_start.elapsed().as_secs_f64() * 1000.0;
-                                let _ = frame_tx.try_send(Frame { rgba, frame_ms });
+                                let _ = frame_tx.try_send(Frame { colour, frame_ms });
                             }
                         }
                         Err(e) => {
@@ -262,6 +272,7 @@ fn main() -> eframe::Result {
                 texture: None,
                 fps: 0.0,
                 frame_ms: 0.0,
+                convert_ms: 0.0,
             }))
         }),
     )
