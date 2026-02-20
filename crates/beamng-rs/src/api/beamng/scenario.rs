@@ -21,7 +21,10 @@ impl ScenarioApi<'_> {
         let levels_val: Vec<rmpv::Value> = levels.iter().map(|l| rmpv::Value::from(*l)).collect();
         self.bng
             .conn()?
-            .message("GetScenarios", &[("levels", rmpv::Value::Array(levels_val))])
+            .message(
+                "GetScenarios",
+                &[("levels", rmpv::Value::Array(levels_val))],
+            )
             .await
     }
 
@@ -46,9 +49,9 @@ impl ScenarioApi<'_> {
         precompile_shaders: bool,
         vehicles: &mut [&mut Vehicle],
     ) -> Result<()> {
-        let path = scenario
-            .path()
-            .ok_or_else(|| BngError::ValueError("Scenario has no path; call make() first".into()))?;
+        let path = scenario.path().ok_or_else(|| {
+            BngError::ValueError("Scenario has no path; call make() first".into())
+        })?;
         self.load(path, precompile_shaders).await?;
 
         // Post-load vehicle discovery and connection (matches Python SDK)
@@ -63,32 +66,41 @@ impl ScenarioApi<'_> {
 
     /// Load a scenario by its path.
     pub async fn load(&self, path: &str, precompile_shaders: bool) -> Result<()> {
-        self.bng.conn()?.ack(
-            "LoadScenario",
-            "MapLoaded",
-            &[
-                ("path", rmpv::Value::from(path)),
-                ("precompileShaders", rmpv::Value::from(precompile_shaders)),
-            ],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "LoadScenario",
+                "MapLoaded",
+                &[
+                    ("path", rmpv::Value::from(path)),
+                    ("precompileShaders", rmpv::Value::from(precompile_shaders)),
+                ],
+            )
+            .await
     }
 
     /// Start the currently loaded scenario.
     pub async fn start(&self, restrict_actions: bool) -> Result<()> {
-        self.bng.conn()?.ack(
-            "StartScenario",
-            "ScenarioStarted",
-            &[("restrict_actions", rmpv::Value::from(restrict_actions))],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "StartScenario",
+                "ScenarioStarted",
+                &[("restrict_actions", rmpv::Value::from(restrict_actions))],
+            )
+            .await
     }
 
     /// Restart the currently running scenario.
     pub async fn restart(&self, restrict_actions: bool) -> Result<()> {
-        self.bng.conn()?.ack(
-            "RestartScenario",
-            "ScenarioRestarted",
-            &[("restrict_actions", rmpv::Value::from(restrict_actions))],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "RestartScenario",
+                "ScenarioRestarted",
+                &[("restrict_actions", rmpv::Value::from(restrict_actions))],
+            )
+            .await
     }
 
     /// Stop the current scenario and return to the main menu.
@@ -147,23 +159,33 @@ impl ScenarioApi<'_> {
     ) -> Result<()> {
         let mut fields: Vec<(&str, rmpv::Value)> = vec![
             ("id", rmpv::Value::from(id)),
-            ("pos", rmpv::Value::Array(vec![
-                rmpv::Value::from(pos.0),
-                rmpv::Value::from(pos.1),
-                rmpv::Value::from(pos.2),
-            ])),
+            (
+                "pos",
+                rmpv::Value::Array(vec![
+                    rmpv::Value::from(pos.0),
+                    rmpv::Value::from(pos.1),
+                    rmpv::Value::from(pos.2),
+                ]),
+            ),
         ];
         if let Some(rot) = rot_quat {
-            fields.push(("rot", rmpv::Value::Array(vec![
-                rmpv::Value::from(rot.0),
-                rmpv::Value::from(rot.1),
-                rmpv::Value::from(rot.2),
-                rmpv::Value::from(rot.3),
-            ])));
+            fields.push((
+                "rot",
+                rmpv::Value::Array(vec![
+                    rmpv::Value::from(rot.0),
+                    rmpv::Value::from(rot.1),
+                    rmpv::Value::from(rot.2),
+                    rmpv::Value::from(rot.3),
+                ]),
+            ));
         }
         self.bng
             .conn()?
-            .ack("TeleportScenarioObject", "ScenarioObjectTeleported", &fields)
+            .ack(
+                "TeleportScenarioObject",
+                "ScenarioObjectTeleported",
+                &fields,
+            )
             .await
     }
 

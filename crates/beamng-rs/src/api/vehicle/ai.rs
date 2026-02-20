@@ -33,10 +33,7 @@ impl AIApi<'_> {
     /// Set a waypoint for the AI to navigate to.
     pub async fn set_waypoint(&self, waypoint: &str) -> Result<()> {
         self.vehicle
-            .send_vehicle_request(
-                "SetAiTarget",
-                &[("waypoint", rmpv::Value::from(waypoint))],
-            )
+            .send_vehicle_request("SetAiTarget", &[("waypoint", rmpv::Value::from(waypoint))])
             .await?;
         Ok(())
     }

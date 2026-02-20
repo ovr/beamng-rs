@@ -39,16 +39,20 @@ impl DebugApi<'_> {
         let radii_val: Vec<rmpv::Value> = radii.iter().map(|r| rmpv::Value::from(*r)).collect();
         let colors_val: Vec<rmpv::Value> = colors.iter().map(|c| color_to_value(*c)).collect();
 
-        let resp = self.bng.conn()?.request(
-            "AddDebugSpheres",
-            &[
-                ("coordinates", rmpv::Value::Array(coords)),
-                ("radii", rmpv::Value::Array(radii_val)),
-                ("colors", rmpv::Value::Array(colors_val)),
-                ("cling", rmpv::Value::from(cling)),
-                ("offset", rmpv::Value::from(offset)),
-            ],
-        ).await?;
+        let resp = self
+            .bng
+            .conn()?
+            .request(
+                "AddDebugSpheres",
+                &[
+                    ("coordinates", rmpv::Value::Array(coords)),
+                    ("radii", rmpv::Value::Array(radii_val)),
+                    ("colors", rmpv::Value::Array(colors_val)),
+                    ("cling", rmpv::Value::from(cling)),
+                    ("offset", rmpv::Value::from(offset)),
+                ],
+            )
+            .await?;
 
         let ids = resp
             .get("sphereIDs")
@@ -61,14 +65,17 @@ impl DebugApi<'_> {
     /// Remove debug spheres by their IDs.
     pub async fn remove_spheres(&self, sphere_ids: &[i64]) -> Result<()> {
         let ids: Vec<rmpv::Value> = sphere_ids.iter().map(|id| rmpv::Value::from(*id)).collect();
-        self.bng.conn()?.ack(
-            "RemoveDebugObjects",
-            "DebugObjectsRemoved",
-            &[
-                ("objType", rmpv::Value::from("spheres")),
-                ("objIDs", rmpv::Value::Array(ids)),
-            ],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "RemoveDebugObjects",
+                "DebugObjectsRemoved",
+                &[
+                    ("objType", rmpv::Value::from("spheres")),
+                    ("objIDs", rmpv::Value::Array(ids)),
+                ],
+            )
+            .await
     }
 
     /// Add a debug polyline.
@@ -80,15 +87,19 @@ impl DebugApi<'_> {
         offset: f64,
     ) -> Result<i64> {
         let coords: Vec<rmpv::Value> = coordinates.iter().map(|c| vec3_to_value(*c)).collect();
-        let resp = self.bng.conn()?.request(
-            "AddDebugPolyline",
-            &[
-                ("coordinates", rmpv::Value::Array(coords)),
-                ("color", color_to_value(color)),
-                ("cling", rmpv::Value::from(cling)),
-                ("offset", rmpv::Value::from(offset)),
-            ],
-        ).await?;
+        let resp = self
+            .bng
+            .conn()?
+            .request(
+                "AddDebugPolyline",
+                &[
+                    ("coordinates", rmpv::Value::Array(coords)),
+                    ("color", color_to_value(color)),
+                    ("cling", rmpv::Value::from(cling)),
+                    ("offset", rmpv::Value::from(offset)),
+                ],
+            )
+            .await?;
 
         resp.get("lineID")
             .and_then(|v| v.as_i64())
@@ -97,14 +108,20 @@ impl DebugApi<'_> {
 
     /// Remove a debug polyline by ID.
     pub async fn remove_polyline(&self, line_id: i64) -> Result<()> {
-        self.bng.conn()?.ack(
-            "RemoveDebugObjects",
-            "DebugObjectsRemoved",
-            &[
-                ("objType", rmpv::Value::from("polylines")),
-                ("objIDs", rmpv::Value::Array(vec![rmpv::Value::from(line_id)])),
-            ],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "RemoveDebugObjects",
+                "DebugObjectsRemoved",
+                &[
+                    ("objType", rmpv::Value::from("polylines")),
+                    (
+                        "objIDs",
+                        rmpv::Value::Array(vec![rmpv::Value::from(line_id)]),
+                    ),
+                ],
+            )
+            .await
     }
 
     /// Add a debug cylinder between two circle centers.
@@ -114,15 +131,20 @@ impl DebugApi<'_> {
         radius: f64,
         color: Color,
     ) -> Result<i64> {
-        let positions: Vec<rmpv::Value> = circle_positions.iter().map(|c| vec3_to_value(*c)).collect();
-        let resp = self.bng.conn()?.request(
-            "AddDebugCylinder",
-            &[
-                ("circlePositions", rmpv::Value::Array(positions)),
-                ("radius", rmpv::Value::from(radius)),
-                ("color", color_to_value(color)),
-            ],
-        ).await?;
+        let positions: Vec<rmpv::Value> =
+            circle_positions.iter().map(|c| vec3_to_value(*c)).collect();
+        let resp = self
+            .bng
+            .conn()?
+            .request(
+                "AddDebugCylinder",
+                &[
+                    ("circlePositions", rmpv::Value::Array(positions)),
+                    ("radius", rmpv::Value::from(radius)),
+                    ("color", color_to_value(color)),
+                ],
+            )
+            .await?;
 
         resp.get("cylinderID")
             .and_then(|v| v.as_i64())
@@ -131,14 +153,20 @@ impl DebugApi<'_> {
 
     /// Remove a debug cylinder by ID.
     pub async fn remove_cylinder(&self, cylinder_id: i64) -> Result<()> {
-        self.bng.conn()?.ack(
-            "RemoveDebugObjects",
-            "DebugObjectsRemoved",
-            &[
-                ("objType", rmpv::Value::from("cylinders")),
-                ("objIDs", rmpv::Value::Array(vec![rmpv::Value::from(cylinder_id)])),
-            ],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "RemoveDebugObjects",
+                "DebugObjectsRemoved",
+                &[
+                    ("objType", rmpv::Value::from("cylinders")),
+                    (
+                        "objIDs",
+                        rmpv::Value::Array(vec![rmpv::Value::from(cylinder_id)]),
+                    ),
+                ],
+            )
+            .await
     }
 
     /// Add a debug triangle.
@@ -150,15 +178,19 @@ impl DebugApi<'_> {
         offset: f64,
     ) -> Result<i64> {
         let verts: Vec<rmpv::Value> = vertices.iter().map(|v| vec3_to_value(*v)).collect();
-        let resp = self.bng.conn()?.request(
-            "AddDebugTriangle",
-            &[
-                ("vertices", rmpv::Value::Array(verts)),
-                ("color", color_to_value(color)),
-                ("cling", rmpv::Value::from(cling)),
-                ("offset", rmpv::Value::from(offset)),
-            ],
-        ).await?;
+        let resp = self
+            .bng
+            .conn()?
+            .request(
+                "AddDebugTriangle",
+                &[
+                    ("vertices", rmpv::Value::Array(verts)),
+                    ("color", color_to_value(color)),
+                    ("cling", rmpv::Value::from(cling)),
+                    ("offset", rmpv::Value::from(offset)),
+                ],
+            )
+            .await?;
 
         resp.get("triangleID")
             .and_then(|v| v.as_i64())
@@ -167,14 +199,20 @@ impl DebugApi<'_> {
 
     /// Remove a debug triangle by ID.
     pub async fn remove_triangle(&self, triangle_id: i64) -> Result<()> {
-        self.bng.conn()?.ack(
-            "RemoveDebugObjects",
-            "DebugObjectsRemoved",
-            &[
-                ("objType", rmpv::Value::from("triangles")),
-                ("objIDs", rmpv::Value::Array(vec![rmpv::Value::from(triangle_id)])),
-            ],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "RemoveDebugObjects",
+                "DebugObjectsRemoved",
+                &[
+                    ("objType", rmpv::Value::from("triangles")),
+                    (
+                        "objIDs",
+                        rmpv::Value::Array(vec![rmpv::Value::from(triangle_id)]),
+                    ),
+                ],
+            )
+            .await
     }
 
     /// Add a debug rectangle.
@@ -186,15 +224,19 @@ impl DebugApi<'_> {
         offset: f64,
     ) -> Result<i64> {
         let verts: Vec<rmpv::Value> = vertices.iter().map(|v| vec3_to_value(*v)).collect();
-        let resp = self.bng.conn()?.request(
-            "AddDebugRectangle",
-            &[
-                ("vertices", rmpv::Value::Array(verts)),
-                ("color", color_to_value(color)),
-                ("cling", rmpv::Value::from(cling)),
-                ("offset", rmpv::Value::from(offset)),
-            ],
-        ).await?;
+        let resp = self
+            .bng
+            .conn()?
+            .request(
+                "AddDebugRectangle",
+                &[
+                    ("vertices", rmpv::Value::Array(verts)),
+                    ("color", color_to_value(color)),
+                    ("cling", rmpv::Value::from(cling)),
+                    ("offset", rmpv::Value::from(offset)),
+                ],
+            )
+            .await?;
 
         resp.get("rectangleID")
             .and_then(|v| v.as_i64())
@@ -203,14 +245,20 @@ impl DebugApi<'_> {
 
     /// Remove a debug rectangle by ID.
     pub async fn remove_rectangle(&self, rectangle_id: i64) -> Result<()> {
-        self.bng.conn()?.ack(
-            "RemoveDebugObjects",
-            "DebugObjectsRemoved",
-            &[
-                ("objType", rmpv::Value::from("rectangles")),
-                ("objIDs", rmpv::Value::Array(vec![rmpv::Value::from(rectangle_id)])),
-            ],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "RemoveDebugObjects",
+                "DebugObjectsRemoved",
+                &[
+                    ("objType", rmpv::Value::from("rectangles")),
+                    (
+                        "objIDs",
+                        rmpv::Value::Array(vec![rmpv::Value::from(rectangle_id)]),
+                    ),
+                ],
+            )
+            .await
     }
 
     /// Add debug text at a position.
@@ -222,16 +270,20 @@ impl DebugApi<'_> {
         cling: bool,
         offset: f64,
     ) -> Result<i64> {
-        let resp = self.bng.conn()?.request(
-            "AddDebugText",
-            &[
-                ("origin", vec3_to_value(origin)),
-                ("content", rmpv::Value::from(content)),
-                ("color", color_to_value(color)),
-                ("cling", rmpv::Value::from(cling)),
-                ("offset", rmpv::Value::from(offset)),
-            ],
-        ).await?;
+        let resp = self
+            .bng
+            .conn()?
+            .request(
+                "AddDebugText",
+                &[
+                    ("origin", vec3_to_value(origin)),
+                    ("content", rmpv::Value::from(content)),
+                    ("color", color_to_value(color)),
+                    ("cling", rmpv::Value::from(cling)),
+                    ("offset", rmpv::Value::from(offset)),
+                ],
+            )
+            .await?;
 
         resp.get("textID")
             .and_then(|v| v.as_i64())
@@ -240,14 +292,20 @@ impl DebugApi<'_> {
 
     /// Remove debug text by ID.
     pub async fn remove_text(&self, text_id: i64) -> Result<()> {
-        self.bng.conn()?.ack(
-            "RemoveDebugObjects",
-            "DebugObjectsRemoved",
-            &[
-                ("objType", rmpv::Value::from("text")),
-                ("objIDs", rmpv::Value::Array(vec![rmpv::Value::from(text_id)])),
-            ],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "RemoveDebugObjects",
+                "DebugObjectsRemoved",
+                &[
+                    ("objType", rmpv::Value::from("text")),
+                    (
+                        "objIDs",
+                        rmpv::Value::Array(vec![rmpv::Value::from(text_id)]),
+                    ),
+                ],
+            )
+            .await
     }
 
     /// Add a debug square prism.
@@ -262,14 +320,18 @@ impl DebugApi<'_> {
             .iter()
             .map(|d| rmpv::Value::Array(vec![rmpv::Value::from(d.0), rmpv::Value::from(d.1)]))
             .collect();
-        let resp = self.bng.conn()?.request(
-            "AddDebugSquarePrism",
-            &[
-                ("endPoints", rmpv::Value::Array(points)),
-                ("dims", rmpv::Value::Array(dims)),
-                ("color", color_to_value(color)),
-            ],
-        ).await?;
+        let resp = self
+            .bng
+            .conn()?
+            .request(
+                "AddDebugSquarePrism",
+                &[
+                    ("endPoints", rmpv::Value::Array(points)),
+                    ("dims", rmpv::Value::Array(dims)),
+                    ("color", color_to_value(color)),
+                ],
+            )
+            .await?;
 
         resp.get("prismID")
             .and_then(|v| v.as_i64())
@@ -278,13 +340,19 @@ impl DebugApi<'_> {
 
     /// Remove a debug square prism by ID.
     pub async fn remove_square_prism(&self, prism_id: i64) -> Result<()> {
-        self.bng.conn()?.ack(
-            "RemoveDebugObjects",
-            "DebugObjectsRemoved",
-            &[
-                ("objType", rmpv::Value::from("squarePrisms")),
-                ("objIDs", rmpv::Value::Array(vec![rmpv::Value::from(prism_id)])),
-            ],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "RemoveDebugObjects",
+                "DebugObjectsRemoved",
+                &[
+                    ("objType", rmpv::Value::from("squarePrisms")),
+                    (
+                        "objIDs",
+                        rmpv::Value::Array(vec![rmpv::Value::from(prism_id)]),
+                    ),
+                ],
+            )
+            .await
     }
 }

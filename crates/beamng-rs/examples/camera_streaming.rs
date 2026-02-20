@@ -37,7 +37,9 @@ async fn main() -> beamng_proto::Result<()> {
     // Configure and load (connects vehicles during load, matching Python SDK)
     let mut ego = Vehicle::new("ego", "etk800");
     bng.settings().set_deterministic(Some(60), None).await?;
-    bng.scenario().load_scenario(&scenario, true, &mut [&mut ego]).await?;
+    bng.scenario()
+        .load_scenario(&scenario, true, &mut [&mut ego])
+        .await?;
     bng.scenario().start(false).await?;
     println!("Scenario started.");
 

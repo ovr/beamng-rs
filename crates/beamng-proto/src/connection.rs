@@ -115,23 +115,12 @@ impl Connection {
     }
 
     /// Send a request and return the assigned request ID without waiting for a response.
-    pub async fn send_raw(
-        &self,
-        req_type: &str,
-        fields: &[(&str, rmpv::Value)],
-    ) -> Result<u64> {
+    pub async fn send_raw(&self, req_type: &str, fields: &[(&str, rmpv::Value)]) -> Result<u64> {
         let req_id = self.next_id();
 
-        let mut pairs: Vec<(rmpv::Value, rmpv::Value)> =
-            Vec::with_capacity(fields.len() + 2);
-        pairs.push((
-            rmpv::Value::from("type"),
-            rmpv::Value::from(req_type),
-        ));
-        pairs.push((
-            rmpv::Value::from("_id"),
-            rmpv::Value::from(req_id),
-        ));
+        let mut pairs: Vec<(rmpv::Value, rmpv::Value)> = Vec::with_capacity(fields.len() + 2);
+        pairs.push((rmpv::Value::from("type"), rmpv::Value::from(req_type)));
+        pairs.push((rmpv::Value::from("_id"), rmpv::Value::from(req_id)));
         for (k, v) in fields {
             pairs.push((rmpv::Value::from(*k), v.clone()));
         }
@@ -197,10 +186,7 @@ impl Connection {
         fields: &[(&str, rmpv::Value)],
     ) -> Result<()> {
         let resp = self.request(req_type, fields).await?;
-        let got = resp
-            .get("type")
-            .and_then(|v| value_as_str(v))
-            .unwrap_or("");
+        let got = resp.get("type").and_then(|v| value_as_str(v)).unwrap_or("");
         if got != ack_type {
             return Err(BngError::UnexpectedResponseType {
                 expected: ack_type.into(),
@@ -218,10 +204,7 @@ impl Connection {
         fields: &[(&str, rmpv::Value)],
     ) -> Result<Option<rmpv::Value>> {
         let resp = self.request(req_type, fields).await?;
-        let resp_type = resp
-            .get("type")
-            .and_then(|v| value_as_str(v))
-            .unwrap_or("");
+        let resp_type = resp.get("type").and_then(|v| value_as_str(v)).unwrap_or("");
         if resp_type != req_type {
             return Err(BngError::UnexpectedResponseType {
                 expected: req_type.into(),
@@ -379,9 +362,7 @@ mod tests {
                     rmpv::Value::from(PROTOCOL_VERSION),
                 ),
             ]);
-            write_frame(&mut writer, &encode(&resp))
-                .await
-                .unwrap();
+            write_frame(&mut writer, &encode(&resp)).await.unwrap();
 
             // Read the Pause request and respond out of order:
             // First send a future response (id=99), then the actual one.
@@ -409,9 +390,7 @@ mod tests {
                 (rmpv::Value::from("type"), rmpv::Value::from("Paused")),
                 (rmpv::Value::from("_id"), id),
             ]);
-            write_frame(&mut writer, &encode(&resp))
-                .await
-                .unwrap();
+            write_frame(&mut writer, &encode(&resp)).await.unwrap();
         });
 
         let conn = Connection::open("127.0.0.1", addr.port()).await.unwrap();

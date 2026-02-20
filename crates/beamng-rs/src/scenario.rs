@@ -126,7 +126,9 @@ impl Scenario {
         let path = resp
             .get("result")
             .and_then(|v| beamng_proto::types::value_to_string(v))
-            .ok_or_else(|| BngError::ValueError("Missing path in CreateScenario response".into()))?;
+            .ok_or_else(|| {
+                BngError::ValueError("Missing path in CreateScenario response".into())
+            })?;
 
         self.path = Some(path);
         Ok(())
@@ -147,7 +149,8 @@ impl Scenario {
 
         for v in &sorted_vehicles {
             let rot_mat = beamng_proto::types::quat_to_rotation_matrix(v.rot_quat);
-            lines.push(serde_json::to_string(&build_vehicle_json(v, &self.name, &rot_mat)).unwrap());
+            lines
+                .push(serde_json::to_string(&build_vehicle_json(v, &self.name, &rot_mat)).unwrap());
         }
 
         // Footer: SimGroup
@@ -162,16 +165,12 @@ impl Scenario {
         let mut vehicles_map: Vec<(rmpv::Value, rmpv::Value)> = Vec::new();
 
         for (i, v) in self.vehicles.iter().enumerate() {
-            let mut props: Vec<(rmpv::Value, rmpv::Value)> = vec![
-                (rmpv::Value::from("playerUsable"), rmpv::Value::from(true)),
-            ];
+            let mut props: Vec<(rmpv::Value, rmpv::Value)> =
+                vec![(rmpv::Value::from("playerUsable"), rmpv::Value::from(true))];
             if i == 0 {
                 props.push((rmpv::Value::from("startFocus"), rmpv::Value::from(true)));
             }
-            vehicles_map.push((
-                rmpv::Value::from(v.vid.as_str()),
-                rmpv::Value::Map(props),
-            ));
+            vehicles_map.push((rmpv::Value::from(v.vid.as_str()), rmpv::Value::Map(props)));
         }
 
         let prefab_path = format!(
@@ -180,13 +179,22 @@ impl Scenario {
         );
 
         rmpv::Value::Map(vec![
-            (rmpv::Value::from("name"), rmpv::Value::from(self.name.as_str())),
+            (
+                rmpv::Value::from("name"),
+                rmpv::Value::from(self.name.as_str()),
+            ),
             (rmpv::Value::from("description"), rmpv::Value::from("")),
             (rmpv::Value::from("difficulty"), rmpv::Value::from(0)),
             (rmpv::Value::from("authors"), rmpv::Value::from("")),
             (rmpv::Value::from("lapConfig"), rmpv::Value::Array(vec![])),
-            (rmpv::Value::from("forceNoCountDown"), rmpv::Value::from(true)),
-            (rmpv::Value::from("vehicles"), rmpv::Value::Map(vehicles_map)),
+            (
+                rmpv::Value::from("forceNoCountDown"),
+                rmpv::Value::from(true),
+            ),
+            (
+                rmpv::Value::from("vehicles"),
+                rmpv::Value::Map(vehicles_map),
+            ),
             (
                 rmpv::Value::from("prefabs"),
                 rmpv::Value::Array(vec![rmpv::Value::from(prefab_path.as_str())]),

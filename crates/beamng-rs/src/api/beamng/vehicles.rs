@@ -17,9 +17,11 @@ impl VehiclesApi<'_> {
         extensions: Option<&[String]>,
     ) -> Result<StrDict> {
         let conn = self.bng.conn()?;
-        let mut fields: Vec<(&str, rmpv::Value)> = vec![("vid", rmpv::Value::from(vehicle.vid.as_str()))];
+        let mut fields: Vec<(&str, rmpv::Value)> =
+            vec![("vid", rmpv::Value::from(vehicle.vid.as_str()))];
         if let Some(exts) = extensions {
-            let exts_val: Vec<rmpv::Value> = exts.iter().map(|s| rmpv::Value::from(s.as_str())).collect();
+            let exts_val: Vec<rmpv::Value> =
+                exts.iter().map(|s| rmpv::Value::from(s.as_str())).collect();
             fields.push(("exts", rmpv::Value::Array(exts_val)));
         }
         conn.request("StartVehicleConnection", &fields).await
@@ -38,17 +40,23 @@ impl VehiclesApi<'_> {
         let mut fields: Vec<(&str, rmpv::Value)> = vec![
             ("name", rmpv::Value::from(vehicle.vid.as_str())),
             ("model", rmpv::Value::from(vehicle.model.as_str())),
-            ("pos", rmpv::Value::Array(vec![
-                rmpv::Value::from(pos.0),
-                rmpv::Value::from(pos.1),
-                rmpv::Value::from(pos.2),
-            ])),
-            ("rot", rmpv::Value::Array(vec![
-                rmpv::Value::from(rot_quat.0),
-                rmpv::Value::from(rot_quat.1),
-                rmpv::Value::from(rot_quat.2),
-                rmpv::Value::from(rot_quat.3),
-            ])),
+            (
+                "pos",
+                rmpv::Value::Array(vec![
+                    rmpv::Value::from(pos.0),
+                    rmpv::Value::from(pos.1),
+                    rmpv::Value::from(pos.2),
+                ]),
+            ),
+            (
+                "rot",
+                rmpv::Value::Array(vec![
+                    rmpv::Value::from(rot_quat.0),
+                    rmpv::Value::from(rot_quat.1),
+                    rmpv::Value::from(rot_quat.2),
+                    rmpv::Value::from(rot_quat.3),
+                ]),
+            ),
             ("cling", rmpv::Value::from(cling)),
         ];
 
@@ -74,12 +82,19 @@ impl VehiclesApi<'_> {
 
     /// Establish a per-vehicle TCP connection.
     pub async fn connect_vehicle(&self, vehicle: &mut Vehicle) -> Result<()> {
-        let resp = self.start_connection(vehicle, vehicle.options.extensions.as_deref()).await?;
+        let resp = self
+            .start_connection(vehicle, vehicle.options.extensions.as_deref())
+            .await?;
         let port = resp
             .get("result")
             .and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64)))
-            .or_else(|| resp.get("port").and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64))))
-            .ok_or_else(|| BngError::ValueError("Missing port in StartVehicleConnection response".into()))?;
+            .or_else(|| {
+                resp.get("port")
+                    .and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64)))
+            })
+            .ok_or_else(|| {
+                BngError::ValueError("Missing port in StartVehicleConnection response".into())
+            })?;
 
         let host = &self.bng.host();
         let stream = tokio::net::TcpStream::connect(format!("{host}:{port}")).await?;
@@ -91,19 +106,19 @@ impl VehiclesApi<'_> {
     /// Despawn a vehicle from the simulation.
     pub async fn despawn(&self, vehicle: &mut Vehicle) -> Result<()> {
         vehicle.disconnect();
-        self.bng.conn()?.ack(
-            "DespawnVehicle",
-            "VehicleDespawned",
-            &[("vid", rmpv::Value::from(vehicle.vid.as_str()))],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "DespawnVehicle",
+                "VehicleDespawned",
+                &[("vid", rmpv::Value::from(vehicle.vid.as_str()))],
+            )
+            .await
     }
 
     /// Retrieve a dictionary of available vehicle models.
     pub async fn get_available(&self) -> Result<StrDict> {
-        self.bng
-            .conn()?
-            .request("GetAvailableVehicles", &[])
-            .await
+        self.bng.conn()?.request("GetAvailableVehicles", &[]).await
     }
 
     /// Teleport a vehicle to a new position.
@@ -116,20 +131,26 @@ impl VehiclesApi<'_> {
     ) -> Result<bool> {
         let mut fields: Vec<(&str, rmpv::Value)> = vec![
             ("vehicle", rmpv::Value::from(vid)),
-            ("pos", rmpv::Value::Array(vec![
-                rmpv::Value::from(pos.0),
-                rmpv::Value::from(pos.1),
-                rmpv::Value::from(pos.2),
-            ])),
+            (
+                "pos",
+                rmpv::Value::Array(vec![
+                    rmpv::Value::from(pos.0),
+                    rmpv::Value::from(pos.1),
+                    rmpv::Value::from(pos.2),
+                ]),
+            ),
             ("reset", rmpv::Value::from(reset)),
         ];
         if let Some(rot) = rot_quat {
-            fields.push(("rot", rmpv::Value::Array(vec![
-                rmpv::Value::from(rot.0),
-                rmpv::Value::from(rot.1),
-                rmpv::Value::from(rot.2),
-                rmpv::Value::from(rot.3),
-            ])));
+            fields.push((
+                "rot",
+                rmpv::Value::Array(vec![
+                    rmpv::Value::from(rot.0),
+                    rmpv::Value::from(rot.1),
+                    rmpv::Value::from(rot.2),
+                    rmpv::Value::from(rot.3),
+                ]),
+            ));
         }
 
         let resp = self.bng.conn()?.request("Teleport", &fields).await?;
@@ -187,10 +208,7 @@ impl VehiclesApi<'_> {
 
     /// Get the current player vehicle ID.
     pub async fn get_player_vehicle_id(&self) -> Result<StrDict> {
-        self.bng
-            .conn()?
-            .request("GetPlayerVehicleID", &[])
-            .await
+        self.bng.conn()?.request("GetPlayerVehicleID", &[]).await
     }
 
     /// Set a vehicle's license plate text.

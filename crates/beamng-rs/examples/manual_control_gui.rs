@@ -36,8 +36,7 @@ impl eframe::App for App {
             match &mut self.texture {
                 Some(h) => h.set(img, egui::TextureOptions::LINEAR),
                 None => {
-                    self.texture =
-                        Some(ctx.load_texture("cam", img, egui::TextureOptions::LINEAR));
+                    self.texture = Some(ctx.load_texture("cam", img, egui::TextureOptions::LINEAR));
                 }
             }
         }
@@ -218,10 +217,12 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "BeamNG Manual Control",
         eframe::NativeOptions::default(),
-        Box::new(|_cc| Ok(Box::new(App {
-            frame_rx,
-            control_tx,
-            texture: None,
-        }))),
+        Box::new(|_cc| {
+            Ok(Box::new(App {
+                frame_rx,
+                control_tx,
+                texture: None,
+            }))
+        }),
     )
 }

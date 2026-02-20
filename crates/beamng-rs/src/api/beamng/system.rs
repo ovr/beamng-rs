@@ -10,13 +10,7 @@ pub struct SystemApi<'a> {
 
 impl SystemApi<'_> {
     /// Returns information about the host's system.
-    pub async fn get_info(
-        &self,
-        os: bool,
-        cpu: bool,
-        gpu: bool,
-        power: bool,
-    ) -> Result<StrDict> {
+    pub async fn get_info(&self, os: bool, cpu: bool, gpu: bool, power: bool) -> Result<StrDict> {
         self.bng
             .conn()?
             .request(
@@ -33,9 +27,6 @@ impl SystemApi<'_> {
 
     /// Returns the environment filesystem paths of the BeamNG simulator.
     pub async fn get_environment_paths(&self) -> Result<StrDict> {
-        self.bng
-            .conn()?
-            .request("GetEnvironmentPaths", &[])
-            .await
+        self.bng.conn()?.request("GetEnvironmentPaths", &[]).await
     }
 }

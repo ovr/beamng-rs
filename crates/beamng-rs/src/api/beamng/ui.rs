@@ -10,11 +10,14 @@ pub struct UiApi<'a> {
 impl UiApi<'_> {
     /// Display a toast message in the simulator UI.
     pub async fn display_message(&self, msg: &str) -> Result<()> {
-        self.bng.conn()?.ack(
-            "DisplayGuiMessage",
-            "GuiMessageDisplayed",
-            &[("message", rmpv::Value::from(msg))],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "DisplayGuiMessage",
+                "GuiMessageDisplayed",
+                &[("message", rmpv::Value::from(msg))],
+            )
+            .await
     }
 
     /// Hide the HUD.

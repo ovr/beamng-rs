@@ -76,10 +76,9 @@ struct ShmemBuffer {
 
 impl ShmemBuffer {
     fn create(size: usize) -> Result<Self> {
-        let shmem = ShmemConf::new()
-            .size(size)
-            .create()
-            .map_err(|e| BngError::Io(std::io::Error::other(format!("shared memory create: {e}"))))?;
+        let shmem = ShmemConf::new().size(size).create().map_err(|e| {
+            BngError::Io(std::io::Error::other(format!("shared memory create: {e}")))
+        })?;
         Ok(Self { shmem, size })
     }
 
@@ -200,7 +199,10 @@ impl<'a> Camera<'a> {
         let fields: Vec<(&str, rmpv::Value)> = vec![
             ("vid", vid_val),
             ("name", rmpv::Value::from(name.as_str())),
-            ("updateTime", rmpv::Value::from(config.requested_update_time)),
+            (
+                "updateTime",
+                rmpv::Value::from(config.requested_update_time),
+            ),
             ("priority", rmpv::Value::from(config.update_priority)),
             (
                 "size",
@@ -241,7 +243,10 @@ impl<'a> Camera<'a> {
                     rmpv::Value::from(config.up.2),
                 ]),
             ),
-            ("useSharedMemory", rmpv::Value::from(config.is_using_shared_memory)),
+            (
+                "useSharedMemory",
+                rmpv::Value::from(config.is_using_shared_memory),
+            ),
             ("colourShmemName", colour_shmem_name),
             ("colourShmemSize", colour_shmem_size),
             ("annotationShmemName", annotation_shmem_name),
@@ -249,15 +254,30 @@ impl<'a> Camera<'a> {
             ("depthShmemName", depth_shmem_name),
             ("depthShmemSize", depth_shmem_size),
             ("renderColours", rmpv::Value::from(config.is_render_colours)),
-            ("renderAnnotations", rmpv::Value::from(config.is_render_annotations)),
-            ("renderInstance", rmpv::Value::from(config.is_render_instance)),
+            (
+                "renderAnnotations",
+                rmpv::Value::from(config.is_render_annotations),
+            ),
+            (
+                "renderInstance",
+                rmpv::Value::from(config.is_render_instance),
+            ),
             ("renderDepth", rmpv::Value::from(config.is_render_depth)),
             ("isVisualised", rmpv::Value::from(config.is_visualised)),
             ("isStreaming", rmpv::Value::from(config.is_streaming)),
             ("isStatic", rmpv::Value::from(config.is_static)),
-            ("isSnappingDesired", rmpv::Value::from(config.is_snapping_desired)),
-            ("isForceInsideTriangle", rmpv::Value::from(config.is_force_inside_triangle)),
-            ("isDirWorldSpace", rmpv::Value::from(config.is_dir_world_space)),
+            (
+                "isSnappingDesired",
+                rmpv::Value::from(config.is_snapping_desired),
+            ),
+            (
+                "isForceInsideTriangle",
+                rmpv::Value::from(config.is_force_inside_triangle),
+            ),
+            (
+                "isDirWorldSpace",
+                rmpv::Value::from(config.is_dir_world_space),
+            ),
             ("integerDepth", rmpv::Value::from(config.integer_depth)),
         ];
 
@@ -383,10 +403,7 @@ impl<'a> Camera<'a> {
                     &[("requestId", rmpv::Value::from(request_id))],
                 )
                 .await?;
-            let ready = resp
-                .get("data")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
+            let ready = resp.get("data").and_then(|v| v.as_bool()).unwrap_or(false);
             if ready {
                 break;
             }

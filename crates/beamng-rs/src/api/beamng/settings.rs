@@ -10,14 +10,17 @@ pub struct SettingsApi<'a> {
 impl SettingsApi<'_> {
     /// Change a game setting.
     pub async fn change(&self, key: &str, value: &str) -> Result<()> {
-        self.bng.conn()?.ack(
-            "ChangeSetting",
-            "SettingsChanged",
-            &[
-                ("key", rmpv::Value::from(key)),
-                ("value", rmpv::Value::from(value)),
-            ],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "ChangeSetting",
+                "SettingsChanged",
+                &[
+                    ("key", rmpv::Value::from(key)),
+                    ("value", rmpv::Value::from(value)),
+                ],
+            )
+            .await
     }
 
     /// Apply pending graphics settings.
@@ -40,7 +43,11 @@ impl SettingsApi<'_> {
         }
         self.bng
             .conn()?
-            .ack("SetPhysicsDeterministic", "SetPhysicsDeterministic", &fields)
+            .ack(
+                "SetPhysicsDeterministic",
+                "SetPhysicsDeterministic",
+                &fields,
+            )
             .await?;
 
         if let Some(sps) = steps_per_second {
@@ -53,7 +60,11 @@ impl SettingsApi<'_> {
     pub async fn set_nondeterministic(&self) -> Result<()> {
         self.bng
             .conn()?
-            .ack("SetPhysicsNonDeterministic", "SetPhysicsNonDeterministic", &[])
+            .ack(
+                "SetPhysicsNonDeterministic",
+                "SetPhysicsNonDeterministic",
+                &[],
+            )
             .await
     }
 
@@ -61,7 +72,11 @@ impl SettingsApi<'_> {
     pub async fn set_steps_per_second(&self, sps: i32) -> Result<()> {
         self.bng
             .conn()?
-            .ack("FPSLimit", "SetFPSLimit", &[("fps", rmpv::Value::from(sps))])
+            .ack(
+                "FPSLimit",
+                "SetFPSLimit",
+                &[("fps", rmpv::Value::from(sps))],
+            )
             .await
     }
 

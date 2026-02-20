@@ -10,25 +10,25 @@ pub struct RootApi<'a> {
 
 impl RootApi<'_> {
     /// Set the vehicle's position and optional rotation.
-    pub async fn set_position(
-        &self,
-        pos: Vec3,
-        rot: Option<Quat>,
-    ) -> Result<()> {
-        let mut fields: Vec<(&str, rmpv::Value)> = vec![
-            ("pos", rmpv::Value::Array(vec![
+    pub async fn set_position(&self, pos: Vec3, rot: Option<Quat>) -> Result<()> {
+        let mut fields: Vec<(&str, rmpv::Value)> = vec![(
+            "pos",
+            rmpv::Value::Array(vec![
                 rmpv::Value::from(pos.0),
                 rmpv::Value::from(pos.1),
                 rmpv::Value::from(pos.2),
-            ])),
-        ];
+            ]),
+        )];
         if let Some(r) = rot {
-            fields.push(("rot", rmpv::Value::Array(vec![
-                rmpv::Value::from(r.0),
-                rmpv::Value::from(r.1),
-                rmpv::Value::from(r.2),
-                rmpv::Value::from(r.3),
-            ])));
+            fields.push((
+                "rot",
+                rmpv::Value::Array(vec![
+                    rmpv::Value::from(r.0),
+                    rmpv::Value::from(r.1),
+                    rmpv::Value::from(r.2),
+                    rmpv::Value::from(r.3),
+                ]),
+            ));
         }
         self.vehicle
             .send_vehicle_request("SetPosition", &fields)

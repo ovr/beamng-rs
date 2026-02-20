@@ -10,13 +10,18 @@ pub struct TrafficApi<'a> {
 impl TrafficApi<'_> {
     /// Enable traffic simulation for the given vehicle IDs.
     pub async fn start(&self, participant_vids: &[&str]) -> Result<()> {
-        let participants: Vec<rmpv::Value> =
-            participant_vids.iter().map(|v| rmpv::Value::from(*v)).collect();
-        self.bng.conn()?.ack(
-            "StartTraffic",
-            "TrafficStarted",
-            &[("participants", rmpv::Value::Array(participants))],
-        ).await
+        let participants: Vec<rmpv::Value> = participant_vids
+            .iter()
+            .map(|v| rmpv::Value::from(*v))
+            .collect();
+        self.bng
+            .conn()?
+            .ack(
+                "StartTraffic",
+                "TrafficStarted",
+                &[("participants", rmpv::Value::Array(participants))],
+            )
+            .await
     }
 
     /// Spawn traffic vehicles.
@@ -27,9 +32,8 @@ impl TrafficApi<'_> {
         extra_amount: Option<i32>,
         parked_amount: Option<i32>,
     ) -> Result<()> {
-        let mut fields: Vec<(&str, rmpv::Value)> = vec![
-            ("police_ratio", rmpv::Value::from(police_ratio)),
-        ];
+        let mut fields: Vec<(&str, rmpv::Value)> =
+            vec![("police_ratio", rmpv::Value::from(police_ratio))];
         if let Some(max) = max_amount {
             fields.push(("max_amount", rmpv::Value::from(max)));
         }
@@ -55,10 +59,13 @@ impl TrafficApi<'_> {
 
     /// Stop the traffic simulation.
     pub async fn stop(&self, stop_vehicles: bool) -> Result<()> {
-        self.bng.conn()?.ack(
-            "StopTraffic",
-            "TrafficStopped",
-            &[("stop", rmpv::Value::from(stop_vehicles))],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "StopTraffic",
+                "TrafficStopped",
+                &[("stop", rmpv::Value::from(stop_vehicles))],
+            )
+            .await
     }
 }

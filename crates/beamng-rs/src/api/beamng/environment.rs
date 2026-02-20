@@ -51,14 +51,17 @@ impl EnvironmentApi<'_> {
 
     /// Set a weather preset.
     pub async fn set_weather_preset(&self, preset: &str, time: f64) -> Result<()> {
-        self.bng.conn()?.ack(
-            "SetWeatherPreset",
-            "WeatherPresetChanged",
-            &[
-                ("preset", rmpv::Value::from(preset)),
-                ("time", rmpv::Value::from(time)),
-            ],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "SetWeatherPreset",
+                "WeatherPresetChanged",
+                &[
+                    ("preset", rmpv::Value::from(preset)),
+                    ("time", rmpv::Value::from(time)),
+                ],
+            )
+            .await
     }
 
     /// Get the current gravity value.
@@ -71,10 +74,13 @@ impl EnvironmentApi<'_> {
 
     /// Set the gravity value. Earth default is -9.807.
     pub async fn set_gravity(&self, gravity: f64) -> Result<()> {
-        self.bng.conn()?.ack(
-            "SetGravity",
-            "GravitySet",
-            &[("gravity", rmpv::Value::from(gravity))],
-        ).await
+        self.bng
+            .conn()?
+            .ack(
+                "SetGravity",
+                "GravitySet",
+                &[("gravity", rmpv::Value::from(gravity))],
+            )
+            .await
     }
 }
