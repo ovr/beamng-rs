@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use beamng_rs::sensors::{Camera, CameraConfig};
 use beamng_rs::vehicle::{Vehicle, VehicleOptions};
 use beamng_rs::{BeamNg, Scenario};
@@ -6,6 +8,14 @@ use tokio::sync::mpsc;
 
 const W: usize = 1280;
 const H: usize = 720;
+
+/// Simulation steps per camera frame. Higher = faster sim, fewer network round-trips.
+const STEPS_PER_FRAME: u32 = 3;
+
+struct Frame {
+    rgba: Vec<u8>,
+    frame_ms: f64,
+}
 
 enum ControlCmd {
     Drive {
@@ -17,9 +27,11 @@ enum ControlCmd {
 }
 
 struct App {
-    frame_rx: mpsc::Receiver<Vec<u8>>,
+    frame_rx: mpsc::Receiver<Frame>,
     control_tx: mpsc::Sender<ControlCmd>,
     texture: Option<egui::TextureHandle>,
+    fps: f64,
+    frame_ms: f64,
 }
 
 impl eframe::App for App {
@@ -30,13 +42,18 @@ impl eframe::App for App {
             latest = Some(f);
         }
 
-        // Upload to GPU texture
-        if let Some(bytes) = latest {
-            let img = egui::ColorImage::from_rgba_unmultiplied([W, H], &bytes);
+        // Upload to GPU texture and update stats
+        if let Some(frame) = latest {
+            self.frame_ms = frame.frame_ms;
+            if frame.frame_ms > 0.0 {
+                self.fps = 1000.0 / frame.frame_ms;
+            }
+            let img = egui::ColorImage::from_rgba_unmultiplied([W, H], &frame.rgba);
             match &mut self.texture {
                 Some(h) => h.set(img, egui::TextureOptions::LINEAR),
                 None => {
-                    self.texture = Some(ctx.load_texture("cam", img, egui::TextureOptions::LINEAR));
+                    self.texture =
+                        Some(ctx.load_texture("cam", img, egui::TextureOptions::LINEAR));
                 }
             }
         }
@@ -68,10 +85,22 @@ impl eframe::App for App {
             parkingbrake,
         });
 
-        // Display camera feed
+        // Display camera feed with FPS overlay
         egui::CentralPanel::default().show(ctx, |ui| {
             if let Some(tex) = &self.texture {
-                ui.image(tex);
+                let response = ui.image(tex);
+
+                // FPS overlay in top-left corner of the image
+                let rect = response.rect;
+                let painter = ui.painter();
+                let text = format!("{:.0} fps  |  {:.1} ms", self.fps, self.frame_ms);
+                painter.text(
+                    rect.left_top() + egui::vec2(8.0, 8.0),
+                    egui::Align2::LEFT_TOP,
+                    text,
+                    egui::FontId::monospace(16.0),
+                    egui::Color32::from_rgba_unmultiplied(0, 255, 0, 200),
+                );
             } else {
                 ui.centered_and_justified(|ui| {
                     ui.label("Connecting to BeamNG...");
@@ -83,10 +112,32 @@ impl eframe::App for App {
     }
 }
 
+/// Convert raw colour bytes to RGBA suitable for egui.
+fn colour_to_rgba(colour: Vec<u8>) -> Option<Vec<u8>> {
+    let expected_rgb = W * H * 3;
+    let expected_rgba = W * H * 4;
+    if colour.len() == expected_rgb {
+        let mut buf = Vec::with_capacity(expected_rgba);
+        for px in colour.chunks_exact(3) {
+            buf.extend_from_slice(px);
+            buf.push(255);
+        }
+        Some(buf)
+    } else if colour.len() == expected_rgba {
+        let mut buf = colour;
+        for px in buf.chunks_exact_mut(4) {
+            px[3] = 255;
+        }
+        Some(buf)
+    } else {
+        None
+    }
+}
+
 fn main() -> eframe::Result {
     tracing_subscriber::fmt::init();
 
-    let (frame_tx, frame_rx) = mpsc::channel(2);
+    let (frame_tx, frame_rx) = mpsc::channel::<Frame>(2);
     let (control_tx, mut control_rx) = mpsc::channel(16);
 
     // Background thread: tokio runtime with BeamNG connection
@@ -121,12 +172,14 @@ fn main() -> eframe::Result {
                 println!("Scenario created.");
 
                 let mut ego = Vehicle::new("ego", "etk800");
+                bng.settings().set_deterministic(Some(60), None).await.unwrap();
                 bng.scenario()
                     .load_scenario(&scenario, true, &mut [&mut ego])
                     .await
                     .unwrap();
                 bng.scenario().start(false).await.unwrap();
-                println!("Scenario started (real-time mode).");
+                bng.control().pause().await.unwrap();
+                println!("Scenario started (deterministic, paused).");
 
                 let camera = Camera::open(
                     "camera1",
@@ -144,66 +197,49 @@ fn main() -> eframe::Result {
                 )
                 .await
                 .unwrap();
-                println!("Camera opened (network polling).");
+                println!("Camera opened.");
 
-                // Spawn a separate task for vehicle controls so they run at ~60fps
-                // independent of camera round-trip time
-                tokio::spawn(async move {
-                    loop {
-                        // Drain channel, apply latest command
-                        let mut latest = None;
-                        while let Ok(cmd) = control_rx.try_recv() {
-                            latest = Some(cmd);
-                        }
-                        if let Some(ControlCmd::Drive {
-                            steering,
-                            throttle,
-                            brake,
-                            parkingbrake,
-                        }) = latest
-                        {
-                            if let Err(e) = ego
-                                .root()
-                                .control(
-                                    Some(steering),
-                                    Some(throttle),
-                                    Some(brake),
-                                    Some(parkingbrake),
-                                    None,
-                                    None,
-                                )
-                                .await
-                            {
-                                eprintln!("Control error: {e}");
-                            }
-                        }
-                        tokio::time::sleep(std::time::Duration::from_millis(16)).await;
-                    }
-                });
-
-                // Camera loop (decoupled from controls)
+                // Synchronized loop: apply controls → step sim → grab camera frame
                 loop {
+                    let tick_start = Instant::now();
+
+                    // 1. Apply latest control input
+                    let mut latest = None;
+                    while let Ok(cmd) = control_rx.try_recv() {
+                        latest = Some(cmd);
+                    }
+                    if let Some(ControlCmd::Drive {
+                        steering,
+                        throttle,
+                        brake,
+                        parkingbrake,
+                    }) = latest
+                    {
+                        let _ = ego
+                            .root()
+                            .control(
+                                Some(steering),
+                                Some(throttle),
+                                Some(brake),
+                                Some(parkingbrake),
+                                None,
+                                None,
+                            )
+                            .await;
+                    }
+
+                    // 2. Advance simulation (renders the camera)
+                    if let Err(e) = bng.control().step(STEPS_PER_FRAME, true).await {
+                        eprintln!("Step error: {e}");
+                        continue;
+                    }
+
+                    // 3. Grab the rendered frame via ad-hoc poll
                     match camera.ad_hoc_poll_raw().await {
                         Ok(raw) => {
-                            if let Some(colour) = raw.colour {
-                                let expected_rgb = W * H * 3;
-                                let expected_rgba = W * H * 4;
-                                if colour.len() == expected_rgb {
-                                    // Network: RGB → RGBA
-                                    let mut buf = Vec::with_capacity(expected_rgba);
-                                    for px in colour.chunks_exact(3) {
-                                        buf.extend_from_slice(px);
-                                        buf.push(255);
-                                    }
-                                    let _ = frame_tx.try_send(buf);
-                                } else if colour.len() == expected_rgba {
-                                    // RGBA with alpha=0
-                                    let mut buf = colour;
-                                    for px in buf.chunks_exact_mut(4) {
-                                        px[3] = 255;
-                                    }
-                                    let _ = frame_tx.try_send(buf);
-                                }
+                            if let Some(rgba) = raw.colour.and_then(colour_to_rgba) {
+                                let frame_ms = tick_start.elapsed().as_secs_f64() * 1000.0;
+                                let _ = frame_tx.try_send(Frame { rgba, frame_ms });
                             }
                         }
                         Err(e) => {
@@ -222,6 +258,8 @@ fn main() -> eframe::Result {
                 frame_rx,
                 control_tx,
                 texture: None,
+                fps: 0.0,
+                frame_ms: 0.0,
             }))
         }),
     )
