@@ -73,7 +73,7 @@ impl RootApi<'_> {
             fields.push(("gear", rmpv::Value::from(v)));
         }
         self.vehicle
-            .send_vehicle_request("VehicleControl", &fields)
+            .send_vehicle_request("Control", &fields)
             .await?;
         Ok(())
     }

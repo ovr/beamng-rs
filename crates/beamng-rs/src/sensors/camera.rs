@@ -50,7 +50,7 @@ impl Default for CameraConfig {
             is_render_annotations: false,
             is_render_instance: false,
             is_render_depth: false,
-            is_visualised: true,
+            is_visualised: false,
             is_static: false,
             is_snapping_desired: false,
             is_force_inside_triangle: false,
@@ -61,6 +61,7 @@ impl Default for CameraConfig {
 }
 
 /// Raw image data from a camera reading.
+#[derive(Debug)]
 pub struct CameraRawReadings {
     pub colour: Option<Vec<u8>>,
     pub annotation: Option<Vec<u8>>,
@@ -90,6 +91,15 @@ impl ShmemBuffer {
         let ptr = self.shmem.as_ptr();
         let slice = unsafe { std::slice::from_raw_parts(ptr, self.size) };
         slice.to_vec()
+    }
+}
+
+/// Extract raw bytes from a msgpack value (handles both Binary and String).
+fn value_to_bytes(val: &rmpv::Value) -> Option<Vec<u8>> {
+    match val {
+        rmpv::Value::Binary(b) => Some(b.clone()),
+        rmpv::Value::String(s) => Some(s.as_bytes().to_vec()),
+        _ => None,
     }
 }
 
@@ -290,27 +300,125 @@ impl<'a> Camera<'a> {
         })
     }
 
-    /// Poll the simulator for the latest camera reading, then read from shared memory.
+    /// Poll the simulator for the latest camera reading.
     ///
-    /// Sends a `PollCamera` message and waits for the response before reading shared memory.
+    /// When shared memory is enabled, sends a `PollCamera` request and then reads from
+    /// the local shared memory buffers. When shared memory is disabled, the image data
+    /// is returned directly in the network response (required for remote connections).
     pub async fn poll_raw(&self) -> Result<CameraRawReadings> {
         let conn = self.bng.conn()?;
-        conn.request(
-            "PollCamera",
-            &[
-                ("name", rmpv::Value::from(self.name.as_str())),
-                (
-                    "isUsingSharedMemory",
-                    rmpv::Value::from(self.config.is_using_shared_memory),
-                ),
-            ],
-        )
-        .await?;
+        let resp = conn
+            .request(
+                "PollCamera",
+                &[
+                    ("name", rmpv::Value::from(self.name.as_str())),
+                    (
+                        "isUsingSharedMemory",
+                        rmpv::Value::from(self.config.is_using_shared_memory),
+                    ),
+                ],
+            )
+            .await?;
+
+        if self.config.is_using_shared_memory {
+            Ok(CameraRawReadings {
+                colour: self.colour_shmem.as_ref().map(|s| s.read()),
+                annotation: self.annotation_shmem.as_ref().map(|s| s.read()),
+                depth: self.depth_shmem.as_ref().map(|s| s.read()),
+            })
+        } else {
+            // Response: { "data": { "colour": <bytes>, "annotation": <bytes>, "depth": <bytes> } }
+            let data = resp
+                .get("data")
+                .cloned()
+                .and_then(beamng_proto::types::value_to_str_dict);
+
+            if data.is_none() {
+                let keys: Vec<_> = resp.keys().collect();
+                info!("PollCamera: no 'data' map in response. Keys: {keys:?}");
+            }
+
+            Ok(CameraRawReadings {
+                colour: data
+                    .as_ref()
+                    .and_then(|d| d.get("colour"))
+                    .and_then(value_to_bytes),
+                annotation: data
+                    .as_ref()
+                    .and_then(|d| d.get("annotation"))
+                    .and_then(value_to_bytes),
+                depth: data
+                    .as_ref()
+                    .and_then(|d| d.get("depth"))
+                    .and_then(value_to_bytes),
+            })
+        }
+    }
+
+    /// Request an ad-hoc render and collect the result.
+    ///
+    /// Unlike [`poll_raw`](Self::poll_raw) which returns cached data, this triggers
+    /// a fresh render on the simulator side and waits for it to complete.
+    /// Works over the network without shared memory.
+    pub async fn ad_hoc_poll_raw(&self) -> Result<CameraRawReadings> {
+        let conn = self.bng.conn()?;
+
+        // 1. Request a render
+        let resp = conn
+            .request(
+                "SendAdHocRequestCamera",
+                &[("name", rmpv::Value::from(self.name.as_str()))],
+            )
+            .await?;
+        let request_id = resp
+            .get("data")
+            .and_then(|v| beamng_proto::types::value_as_u64(v))
+            .ok_or_else(|| BngError::ValueError("Missing request_id from ad-hoc poll".into()))?;
+
+        // 2. Wait until the render is ready
+        loop {
+            let resp = conn
+                .request(
+                    "IsAdHocPollRequestReadyCamera",
+                    &[("requestId", rmpv::Value::from(request_id))],
+                )
+                .await?;
+            let ready = resp
+                .get("data")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if ready {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        }
+
+        // 3. Collect the rendered data
+        let resp = conn
+            .request(
+                "CollectAdHocPollRequestCamera",
+                &[("requestId", rmpv::Value::from(request_id))],
+            )
+            .await?;
+
+        let data = resp
+            .get("data")
+            .cloned()
+            .and_then(beamng_proto::types::value_to_str_dict);
 
         Ok(CameraRawReadings {
-            colour: self.colour_shmem.as_ref().map(|s| s.read()),
-            annotation: self.annotation_shmem.as_ref().map(|s| s.read()),
-            depth: self.depth_shmem.as_ref().map(|s| s.read()),
+            colour: data
+                .as_ref()
+                .and_then(|d| d.get("colour"))
+                .and_then(value_to_bytes),
+            annotation: data
+                .as_ref()
+                .and_then(|d| d.get("annotation"))
+                .and_then(value_to_bytes),
+            depth: data
+                .as_ref()
+                .and_then(|d| d.get("depth"))
+                .and_then(value_to_bytes),
         })
     }
 
