@@ -34,19 +34,14 @@ async fn main() -> beamng_proto::Result<()> {
     scenario.make(&bng).await?;
     println!("Scenario created.");
 
-    // Configure and load
+    // Configure and load (connects vehicles during load, matching Python SDK)
+    let mut ego = Vehicle::new("ego", "etk800");
     bng.settings().set_deterministic(Some(60), None).await?;
-    bng.scenario().load_scenario(&scenario, true).await?;
+    bng.scenario().load_scenario(&scenario, true, &mut [&mut ego]).await?;
     bng.scenario().start(false).await?;
     println!("Scenario started.");
 
-    // Pause after start so vehicles have spawned
     bng.control().pause().await?;
-
-    // Connect the vehicle and set AI
-    let mut ego = Vehicle::new("ego", "etk800");
-    bng.vehicles().await_spawn("ego").await?;
-    bng.vehicles().connect_vehicle(&mut ego).await?;
     ego.ai().set_mode("traffic").await?;
 
     // Open the camera sensor with shared-memory streaming

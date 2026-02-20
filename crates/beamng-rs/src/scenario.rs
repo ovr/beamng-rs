@@ -107,9 +107,7 @@ impl Scenario {
         }
 
         let prefab = self.build_prefab();
-        tracing::debug!("Prefab:\n{}", prefab);
         let info = self.build_info_dict();
-        tracing::debug!("Info dict: {:?}", info);
 
         let conn = bng.conn()?;
         let resp = conn
@@ -207,7 +205,7 @@ fn build_vehicle_json(v: &ScenarioVehicle, scenario_name: &str, rot_mat: &[f64; 
     obj.insert("position".into(), json!([v.pos.0, v.pos.1, v.pos.2]));
 
     if let Some(color) = v.options.color {
-        let c = json!([color.0, color.1, color.2, 0.0]);
+        let c = json!([color.0, color.1, color.2, color.3]);
         obj.insert("color".into(), c.clone());
         obj.insert("colorPalette0".into(), c.clone());
         obj.insert("colorPalette1".into(), c);
@@ -238,29 +236,4 @@ fn build_footer_json(scenario_name: &str, uuid: &str) -> JsonValue {
     obj.insert("persistentId".into(), json!(uuid));
     obj.insert("groupPosition".into(), json!("0.000000 0.000000 0.000000"));
     JsonValue::Object(obj)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn print_prefab() {
-        let mut scenario = Scenario::new("italy", "camera_streaming");
-        scenario.add_vehicle(
-            "ego",
-            "etk800",
-            (237.90, -894.42, 246.10),
-            (0.0173, -0.0019, -0.6354, 0.7720),
-            VehicleOptions {
-                color: Some((1.0, 1.0, 1.0, 1.0)),
-                ..Default::default()
-            },
-        );
-        let prefab = scenario.build_prefab();
-        println!("=== PREFAB ===\n{}\n=== END ===", prefab);
-
-        let info = scenario.build_info_dict();
-        println!("=== INFO ===\n{:?}\n=== END ===", info);
-    }
 }

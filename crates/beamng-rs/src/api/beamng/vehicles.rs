@@ -77,8 +77,8 @@ impl VehiclesApi<'_> {
         let resp = self.start_connection(vehicle, vehicle.options.extensions.as_deref()).await?;
         let port = resp
             .get("result")
-            .and_then(|v| v.as_u64())
-            .or_else(|| resp.get("port").and_then(|v| v.as_u64()))
+            .and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64)))
+            .or_else(|| resp.get("port").and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64))))
             .ok_or_else(|| BngError::ValueError("Missing port in StartVehicleConnection response".into()))?;
 
         let host = &self.bng.host();

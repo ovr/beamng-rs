@@ -3,6 +3,7 @@ use beamng_proto::{BngError, Result};
 
 use crate::beamng::BeamNg;
 use crate::scenario::Scenario;
+use crate::vehicle::Vehicle;
 
 /// API for working with scenarios, levels and scenario objects.
 pub struct ScenarioApi<'a> {
@@ -33,16 +34,31 @@ impl ScenarioApi<'_> {
             .ok_or_else(|| BngError::ValueError("Missing scenario name".into()))
     }
 
-    /// Load a [`Scenario`] that was previously created with [`Scenario::make`].
+    /// Load a [`Scenario`] that was previously created with [`Scenario::make`],
+    /// and optionally connect its vehicles (matching Python SDK behavior).
+    ///
+    /// After the map is loaded, this discovers spawned vehicles, identifies
+    /// the player vehicle, and establishes per-vehicle TCP connections —
+    /// exactly like Python's `scenario.load()`.
     pub async fn load_scenario(
         &self,
         scenario: &Scenario,
         precompile_shaders: bool,
+        vehicles: &mut [&mut Vehicle],
     ) -> Result<()> {
         let path = scenario
             .path()
             .ok_or_else(|| BngError::ValueError("Scenario has no path; call make() first".into()))?;
-        self.load(path, precompile_shaders).await
+        self.load(path, precompile_shaders).await?;
+
+        // Post-load vehicle discovery and connection (matches Python SDK)
+        self.bng.vehicles().get_current_info(false).await?;
+        self.bng.vehicles().get_player_vehicle_id().await?;
+        for veh in vehicles.iter_mut() {
+            self.bng.vehicles().connect_vehicle(veh).await?;
+        }
+
+        Ok(())
     }
 
     /// Load a scenario by its path.
