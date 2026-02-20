@@ -73,7 +73,7 @@ impl VehiclesApi<'_> {
     }
 
     /// Establish a per-vehicle TCP connection.
-    async fn connect_vehicle(&self, vehicle: &mut Vehicle) -> Result<()> {
+    pub async fn connect_vehicle(&self, vehicle: &mut Vehicle) -> Result<()> {
         let resp = self.start_connection(vehicle, vehicle.options.extensions.as_deref()).await?;
         let port = resp
             .get("result")

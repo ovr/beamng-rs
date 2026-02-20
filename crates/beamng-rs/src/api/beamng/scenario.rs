@@ -2,6 +2,7 @@ use beamng_proto::types::StrDict;
 use beamng_proto::{BngError, Result};
 
 use crate::beamng::BeamNg;
+use crate::scenario::Scenario;
 
 /// API for working with scenarios, levels and scenario objects.
 pub struct ScenarioApi<'a> {
@@ -30,6 +31,18 @@ impl ScenarioApi<'_> {
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
             .ok_or_else(|| BngError::ValueError("Missing scenario name".into()))
+    }
+
+    /// Load a [`Scenario`] that was previously created with [`Scenario::make`].
+    pub async fn load_scenario(
+        &self,
+        scenario: &Scenario,
+        precompile_shaders: bool,
+    ) -> Result<()> {
+        let path = scenario
+            .path()
+            .ok_or_else(|| BngError::ValueError("Scenario has no path; call make() first".into()))?;
+        self.load(path, precompile_shaders).await
     }
 
     /// Load a scenario by its path.

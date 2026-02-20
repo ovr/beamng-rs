@@ -8,8 +8,11 @@ description = "Rust SDK for BeamNG.tech simulator"
 beamng-proto = { path = "../beamng-proto" }
 rmpv = { version = "1", features = ["with-serde"] }
 serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+shared_memory = "0.12"
 tokio = { version = "1", features = ["net", "io-util", "sync", "time", "macros", "rt-multi-thread", "process"] }
 tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 tracing-subscriber = "0.3"

@@ -8,7 +8,7 @@ use tracing::{debug, info};
 
 use crate::error::{BngError, Result};
 use crate::frame::{read_frame, write_frame};
-use crate::types::{value_as_str, value_as_u64, value_to_str_dict, StrDict};
+use crate::types::{value_as_str, value_as_u64, value_to_str_dict, value_to_string, StrDict};
 
 /// The protocol version this client speaks.
 pub const PROTOCOL_VERSION: &str = "v1.26";
@@ -247,11 +247,11 @@ impl Connection {
     /// Check if a response dict contains a simulator error.
     fn check_sim_error(dict: &StrDict) -> Option<BngError> {
         if let Some(val) = dict.get("bngError") {
-            let msg = val.as_str().unwrap_or("unknown error").to_string();
+            let msg = value_to_string(val).unwrap_or_else(|| "unknown error".to_string());
             return Some(BngError::SimulatorError(msg));
         }
         if let Some(val) = dict.get("bngValueError") {
-            let msg = val.as_str().unwrap_or("unknown value error").to_string();
+            let msg = value_to_string(val).unwrap_or_else(|| "unknown value error".to_string());
             return Some(BngError::ValueError(msg));
         }
         None
